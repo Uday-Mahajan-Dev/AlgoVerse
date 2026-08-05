@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'router.dart';
 import 'theme.dart';
 
 class AlgoVerseApp extends StatelessWidget {
@@ -7,21 +8,11 @@ class AlgoVerseApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       debugShowCheckedModeBanner: false,
-
       title: 'AlgoVerse',
-
       theme: AppTheme.lightTheme,
-
-      home: const Scaffold(
-        body: Center(
-          child: Text(
-            'AlgoVerse',
-            style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
-          ),
-        ),
-      ),
+      routerConfig: appRouter,
     );
   }
 }

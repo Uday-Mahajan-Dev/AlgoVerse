@@ -1,0 +1,80 @@
+########################################
+# Flutter
+########################################
+**/build/
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.packages
+**/.pub-cache/
+**/.pub/
+**/coverage/
+
+########################################
+# Android
+########################################
+**/android/.gradle/
+**/android/app/debug/
+**/android/app/profile/
+**/android/app/release/
+
+########################################
+# iOS/macOS
+########################################
+**/ios/Pods/
+**/ios/.symlinks/
+**/macos/Pods/
+
+########################################
+# Python
+########################################
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/.coverage
+
+########################################
+# Virtual Environments
+########################################
+**/.venv/
+**/venv/
+
+########################################
+# Environment Files
+########################################
+**/.env
+
+########################################
+# VS Code
+########################################
+.vscode/settings.json
+.vscode/launch.json
+
+########################################
+# Logs
+########################################
+*.log
+
+########################################
+# OS Files
+########################################
+.DS_Store
+Thumbs.db
+
+########################################
+# Temporary
+########################################
+*.tmp
+*.swp
+
+# Flutter generated
+**/.metadata
+**/linux/flutter/generated_*
+**/windows/flutter/generated_*
+**/macos/Flutter/GeneratedPluginRegistrant.swift
+
+# VS Code
+.vscode/*
+!.vscode/extensions.json
