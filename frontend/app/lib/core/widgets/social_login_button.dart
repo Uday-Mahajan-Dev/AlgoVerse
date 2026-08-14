@@ -5,7 +5,7 @@ import '../theme/app_radius.dart';
 class SocialLoginButton extends StatelessWidget {
   final String text;
   final IconData icon;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   const SocialLoginButton({
     super.key,

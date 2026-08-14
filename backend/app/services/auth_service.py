@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
+from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -19,15 +20,11 @@ from app.exceptions.auth import (
 )
 from app.models.refresh_token import RefreshToken
 from app.models.user import User
-from app.repositories.refresh_token_repository import (
-    RefreshTokenRepository,
-)
+from app.repositories.email_otp_repository import EmailOTPRepository
+from app.repositories.refresh_token_repository import RefreshTokenRepository
 from app.repositories.role_repository import RoleRepository
 from app.repositories.user_repository import UserRepository
-from app.schemas.auth import (
-    LoginRequest,
-    RegisterRequest,
-)
+from app.schemas.auth import LoginRequest, RegisterRequest
 from app.schemas.token import Token
 from app.services.email_otp_service import EmailOTPService
 from app.services.email_service import EmailService
@@ -123,6 +120,48 @@ class AuthService:
         )
 
     @staticmethod
+    def resend_verification(
+        db: Session,
+        email: str,
+    ) -> None:
+
+        user = UserRepository.get_by_email(
+            db,
+            email,
+        )
+
+        if user is None:
+            raise InvalidCredentialsException()
+
+        if user.email_verified:
+            raise InvalidCredentialsException()
+
+        latest_otp = EmailOTPRepository.get_latest(
+            db=db,
+            user_id=user.id,
+        )
+
+        if latest_otp is not None:
+            cooldown = timedelta(
+                seconds=settings.EMAIL_OTP_RESEND_COOLDOWN_SECONDS,
+            )
+
+            now = datetime.now(timezone.utc)
+
+            if now - latest_otp.created_at < cooldown:
+                raise InvalidCredentialsException()
+
+        otp = EmailOTPService.create_otp(
+            db=db,
+            user_id=user.id,
+        )
+
+        EmailService.send_email_otp(
+            recipient=user.email,
+            otp=otp,
+        )
+
+    @staticmethod
     def login(
         db: Session,
         data: LoginRequest,
@@ -136,7 +175,6 @@ class AuthService:
         if user is None:
             raise InvalidCredentialsException()
 
-        # OAuth-only account
         if not user.hashed_password:
             raise InvalidCredentialsException()
 
@@ -144,6 +182,9 @@ class AuthService:
             data.password,
             user.hashed_password,
         ):
+            raise InvalidCredentialsException()
+
+        if not user.email_verified:
             raise InvalidCredentialsException()
 
         access_token = create_access_token(
@@ -188,9 +229,17 @@ class AuthService:
         if payload is None:
             raise InvalidCredentialsException()
 
+        if payload.get("type") != "refresh":
+            raise InvalidCredentialsException()
+
         user_id = payload.get("sub")
 
         if user_id is None:
+            raise InvalidCredentialsException()
+
+        try:
+            user_uuid = UUID(str(user_id))
+        except ValueError:
             raise InvalidCredentialsException()
 
         token_hash = hash_token(
@@ -203,6 +252,9 @@ class AuthService:
         )
 
         if stored_token is None:
+            raise InvalidCredentialsException()
+
+        if stored_token.user_id != user_uuid:
             raise InvalidCredentialsException()
 
         if stored_token.revoked:
@@ -254,6 +306,9 @@ class AuthService:
         )
 
         if payload is None:
+            raise InvalidCredentialsException()
+
+        if payload.get("type") != "refresh":
             raise InvalidCredentialsException()
 
         token_hash = hash_token(

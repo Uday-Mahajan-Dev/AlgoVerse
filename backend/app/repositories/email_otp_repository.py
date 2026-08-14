@@ -21,6 +21,22 @@ class EmailOTPRepository:
         return otp
 
     @staticmethod
+    def get_latest(
+        db: Session,
+        user_id: UUID,
+    ) -> EmailOTP | None:
+
+        return db.scalar(
+            select(EmailOTP)
+            .where(
+                EmailOTP.user_id == user_id,
+            )
+            .order_by(
+                EmailOTP.created_at.desc(),
+            )
+        )
+
+    @staticmethod
     def get_latest_active(
         db: Session,
         user_id: UUID,
@@ -33,7 +49,7 @@ class EmailOTPRepository:
                 EmailOTP.used.is_(False),
             )
             .order_by(
-                EmailOTP.created_at.desc()
+                EmailOTP.created_at.desc(),
             )
         )
 

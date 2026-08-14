@@ -4,9 +4,7 @@ from pydantic import BaseModel, EmailStr
 class RegisterRequest(BaseModel):
     username: str
     email: EmailStr
-
     password: str
-
     first_name: str
     last_name: str
 
@@ -19,6 +17,10 @@ class RegisterResponse(BaseModel):
 class VerifyEmailRequest(BaseModel):
     email: EmailStr
     otp: str
+
+
+class ResendVerificationRequest(BaseModel):
+    email: EmailStr
 
 
 class LoginRequest(BaseModel):

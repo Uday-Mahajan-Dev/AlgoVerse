@@ -1,22 +1,34 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
-    get_db,
+    get_current_admin,
     get_current_user,
+    get_db,
 )
 from app.models.user import User
 from app.schemas.auth import (
     LoginRequest,
     RegisterRequest,
     RegisterResponse,
+    ResendVerificationRequest,
     VerifyEmailRequest,
 )
 from app.schemas.logout import LogoutRequest
 from app.schemas.refresh import RefreshRequest
+from app.schemas.social_auth import SocialLoginRequest
+from app.schemas.teacher_invitation import (
+    TeacherInvitationAcceptResponse,
+    TeacherInvitationCreate,
+    TeacherInvitationResponse,
+)
 from app.schemas.token import Token
 from app.schemas.user import UserResponse
 from app.services.auth_service import AuthService
+from app.services.social_auth_service import SocialAuthService
+from app.services.teacher_invitation_service import (
+    TeacherInvitationService,
+)
 
 
 router = APIRouter(
@@ -60,6 +72,21 @@ def verify_email(
     )
 
 
+@router.post("/resend-verification")
+def resend_verification(
+    data: ResendVerificationRequest,
+    db: Session = Depends(get_db),
+):
+    AuthService.resend_verification(
+        db=db,
+        email=data.email,
+    )
+
+    return {
+        "message": "A new verification code has been sent."
+    }
+
+
 @router.post(
     "/login",
     response_model=Token,
@@ -71,6 +98,66 @@ def login(
     return AuthService.login(
         db=db,
         data=data,
+    )
+
+
+@router.post(
+    "/social-login",
+    response_model=Token,
+)
+def social_login(
+    data: SocialLoginRequest,
+    db: Session = Depends(get_db),
+):
+    return SocialAuthService.login(
+        db=db,
+        id_token=data.id_token,
+    )
+
+
+@router.post(
+    "/teacher-invitations",
+    response_model=TeacherInvitationResponse,
+    status_code=201,
+)
+def create_teacher_invitation(
+    data: TeacherInvitationCreate,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    invitation = TeacherInvitationService.create_invitation(
+        db=db,
+        email=data.email,
+        invited_by=current_admin.id,
+    )
+
+    return TeacherInvitationResponse(
+        message="Teacher invitation sent successfully.",
+        email=invitation.email,
+    )
+
+
+@router.get(
+    "/teacher-invitations/accept",
+    response_model=TeacherInvitationAcceptResponse,
+)
+def accept_teacher_invitation(
+    token: str = Query(...),
+    db: Session = Depends(get_db),
+):
+    invitation = TeacherInvitationService.accept_invitation(
+        db=db,
+        raw_token=token,
+    )
+
+    return TeacherInvitationAcceptResponse(
+        message=(
+            "Teacher invitation accepted. "
+            "Please sign in using this email address."
+        ),
+        email=invitation.email,
+        status=invitation.status,
+        expires_at=invitation.expires_at,
     )
 
 
@@ -110,4 +197,4 @@ def logout(
 def me(
     current_user: User = Depends(get_current_user),
 ):
-    return current_user
+    return UserResponse.from_user(current_user)

@@ -1,7 +1,9 @@
 from collections.abc import Generator
+from uuid import UUID
 
 from fastapi import Depends
-from fastapi.security import OAuth2PasswordBearer
+# from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
 from app.core.enums import UserRole
@@ -12,9 +14,7 @@ from app.models.user import User
 from app.repositories.user_repository import UserRepository
 
 
-oauth2_scheme = OAuth2PasswordBearer(
-    tokenUrl="/api/v1/auth/login",
-)
+bearer_scheme = HTTPBearer()
 
 
 def get_db() -> Generator[Session, None, None]:
@@ -27,23 +27,34 @@ def get_db() -> Generator[Session, None, None]:
 
 
 def get_current_user(
-    token: str = Depends(oauth2_scheme),
+    credentials: HTTPAuthorizationCredentials = Depends(
+        bearer_scheme
+    ),
     db: Session = Depends(get_db),
 ) -> User:
+    token = credentials.credentials
 
     payload = decode_token(token)
 
-    if payload is None:
+    if not payload:
+        raise InvalidCredentialsException()
+
+    if payload.get("type") != "access":
         raise InvalidCredentialsException()
 
     user_id = payload.get("sub")
 
-    if user_id is None:
+    if not user_id:
+        raise InvalidCredentialsException()
+
+    try:
+        user_uuid = UUID(str(user_id))
+    except ValueError:
         raise InvalidCredentialsException()
 
     user = UserRepository.get_by_id(
         db=db,
-        user_id=user_id,
+        user_id=user_uuid,
     )
 
     if user is None:

@@ -43,6 +43,9 @@ dependencies:
   hive_flutter: ^1.1.0
   shared_preferences: ^2.5.5
   lottie: ^3.3.2
+  firebase_core: ^4.13.0
+  firebase_auth: ^6.5.7
+  http: ^1.6.0
 
 dev_dependencies:
   flutter_test:

@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "1006860409119",
+    "project_id": "algoverseit",
+    "storage_bucket": "algoverseit.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1006860409119:android:4c3d474e865bd43634b82a",
+        "android_client_info": {
+          "package_name": "com.algoverse.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1006860409119-g8n6259qtdtgrg15ufjfjh0iqf9irt76.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.algoverse.app",
+            "certificate_hash": "8dcdfc1d85792cca33ccb6e6032e2b618793fcb3"
+          }
+        },
+        {
+          "client_id": "1006860409119-igrfiq3fd85bbqs74d9n9hfme0vn0lu6.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC6HZZIIwjaRgvq1nB2HJYANwBOaXlaupk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1006860409119-igrfiq3fd85bbqs74d9n9hfme0vn0lu6.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

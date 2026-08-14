@@ -77,3 +77,34 @@ AlgoVerse Team
             subject=subject,
             body=body,
         )
+
+
+    @staticmethod
+    def send_teacher_invitation(
+        recipient: str,
+        invitation_url: str,
+    ) -> None:
+
+        subject = "You're invited to join AlgoVerse as a Teacher"
+
+        body = f"""Hello,
+
+You have been invited to join AlgoVerse as a Teacher.
+
+Please use the following link to accept your invitation:
+
+{invitation_url}
+
+This invitation expires in {settings.TEACHER_INVITATION_EXPIRE_HOURS} hours.
+
+If you were not expecting this invitation, you can safely ignore this email.
+
+Regards,
+AlgoVerse Team
+"""
+
+        EmailService.send_email(
+            recipient=recipient,
+            subject=subject,
+            body=body,
+        )

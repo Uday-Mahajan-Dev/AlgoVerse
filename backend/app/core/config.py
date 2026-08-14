@@ -28,10 +28,10 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
 
+    # ==========================================
+    # Email OTP
+    # ==========================================
 
-    #  ===============================================
-    # EMAIL 
-    # ================================================
     EMAIL_OTP_EXPIRE_MINUTES: int = 10
     EMAIL_OTP_MAX_ATTEMPTS: int = 5
 
@@ -43,6 +43,25 @@ class Settings(BaseSettings):
     EMAIL_FROM_NAME: str = "AlgoVerse"
     EMAIL_USE_TLS: bool = True
 
+    EMAIL_OTP_RESEND_COOLDOWN_SECONDS: int = 60
+
+
+    # ==========================================
+    # Teacher Invitations
+    # ==========================================
+
+    TEACHER_INVITATION_EXPIRE_HOURS: int = 48
+
+    TEACHER_INVITATION_BASE_URL: str = (
+        "http://localhost:3000/teacher-invitation"
+    )
+
+
+    # ==========================================
+    # Firebase
+    # ==========================================
+
+    FIREBASE_CREDENTIALS_PATH: str = "firebase-service-account.json"
 
     # ==========================================
     # Settings
@@ -52,8 +71,6 @@ class Settings(BaseSettings):
         env_file=".env",
         extra="ignore",
     )
-
-    
 
 
 settings = Settings()

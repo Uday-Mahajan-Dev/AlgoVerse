@@ -1,8 +1,19 @@
 class AppRoutes {
   AppRoutes._();
 
+  // ============================================================
+  // AUTH
+  // ============================================================
+
   static const splash = '/';
   static const login = '/login';
+  static const register = '/register';
+  static const verifyEmail = '/verify-email';
+
+  // ============================================================
+  // MAIN
+  // ============================================================
+
   static const home = '/home';
 
   static const stories = '/stories';
