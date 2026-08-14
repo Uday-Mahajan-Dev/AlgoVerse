@@ -69,15 +69,6 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
-  assets:
-    - assets/animations/lottie/
-    - assets/animations/rive/
-    - assets/icons/
-    - assets/images/
-    - assets/illustrations/
-    - assets/videos/
-    - assets/sounds/
-
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg
