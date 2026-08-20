@@ -11,17 +11,14 @@ import '../widgets/teacher_top_bar.dart';
 import '../widgets/weak_concepts_card.dart';
 
 class TeacherDashboardPage extends ConsumerStatefulWidget {
-  const TeacherDashboardPage({
-    super.key,
-  });
+  const TeacherDashboardPage({super.key});
 
   @override
   ConsumerState<TeacherDashboardPage> createState() =>
       _TeacherDashboardPageState();
 }
 
-class _TeacherDashboardPageState
-    extends ConsumerState<TeacherDashboardPage> {
+class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
   int selectedIndex = 0;
 
   @override
@@ -29,8 +26,7 @@ class _TeacherDashboardPageState
     final dashboardAsync = ref.watch(teacherDashboardProvider);
 
     return Scaffold(
-      backgroundColor:
-          Theme.of(context).colorScheme.surfaceContainerLowest,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
 
       drawer: MediaQuery.sizeOf(context).width < 900
           ? Drawer(
@@ -65,34 +61,28 @@ class _TeacherDashboardPageState
                 Builder(
                   builder: (context) {
                     return TeacherTopBar(
-                      onMenuPressed:
-                          MediaQuery.sizeOf(context).width < 900
-                              ? () {
-                                  Scaffold.of(context).openDrawer();
-                                }
-                              : null,
+                      onMenuPressed: MediaQuery.sizeOf(context).width < 900
+                          ? () {
+                              Scaffold.of(context).openDrawer();
+                            }
+                          : null,
                     );
                   },
                 ),
 
                 Expanded(
                   child: dashboardAsync.when(
-                    loading: () => const Center(
-                      child: CircularProgressIndicator(),
-                    ),
+                    loading: () =>
+                        const Center(child: CircularProgressIndicator()),
 
                     error: (error, stackTrace) => _ErrorView(
                       onRetry: () {
-                        ref.invalidate(
-                          teacherDashboardProvider,
-                        );
+                        ref.invalidate(teacherDashboardProvider);
                       },
                     ),
 
                     data: (dashboard) {
-                      return _DashboardContent(
-                        dashboard: dashboard,
-                      );
+                      return _DashboardContent(dashboard: dashboard);
                     },
                   ),
                 ),
@@ -108,9 +98,7 @@ class _TeacherDashboardPageState
 class _DashboardContent extends StatelessWidget {
   final TeacherDashboardData dashboard;
 
-  const _DashboardContent({
-    required this.dashboard,
-  });
+  const _DashboardContent({required this.dashboard});
 
   @override
   Widget build(BuildContext context) {
@@ -120,20 +108,15 @@ class _DashboardContent extends StatelessWidget {
       padding: const EdgeInsets.all(28),
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(
-            maxWidth: 1500,
-          ),
+          constraints: const BoxConstraints(maxWidth: 1500),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 'Teacher Dashboard',
-                style: Theme.of(context)
-                    .textTheme
-                    .headlineMedium
-                    ?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
               ),
 
               const SizedBox(height: 8),
@@ -152,8 +135,8 @@ class _DashboardContent extends StatelessWidget {
                   final cardWidth = width >= 1200
                       ? (width - 48) / 4
                       : width >= 700
-                          ? (width - 16) / 2
-                          : width;
+                      ? (width - 16) / 2
+                      : width;
 
                   return Wrap(
                     spacing: 16,
@@ -183,8 +166,7 @@ class _DashboardContent extends StatelessWidget {
                         width: cardWidth,
                         child: DashboardStatCard(
                           title: 'Average Mastery',
-                          value:
-                              '${(stats.averageMastery * 100).round()}%',
+                          value: '${(stats.averageMastery * 100).round()}%',
                           subtitle: 'Across DSA concepts',
                           icon: Icons.trending_up_rounded,
                         ),
@@ -206,9 +188,7 @@ class _DashboardContent extends StatelessWidget {
 
               const SizedBox(height: 24),
 
-              ConceptPerformanceCard(
-                concepts: dashboard.conceptPerformance,
-              ),
+              ConceptPerformanceCard(concepts: dashboard.conceptPerformance),
 
               const SizedBox(height: 24),
 
@@ -216,8 +196,7 @@ class _DashboardContent extends StatelessWidget {
                 builder: (context, constraints) {
                   if (constraints.maxWidth >= 900) {
                     return Row(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
                           child: WeakConceptsCard(
@@ -229,8 +208,7 @@ class _DashboardContent extends StatelessWidget {
 
                         Expanded(
                           child: RecentActivityCard(
-                            activities:
-                                dashboard.recentActivities,
+                            activities: dashboard.recentActivities,
                           ),
                         ),
                       ],
@@ -239,15 +217,12 @@ class _DashboardContent extends StatelessWidget {
 
                   return Column(
                     children: [
-                      WeakConceptsCard(
-                        concepts: dashboard.weakConcepts,
-                      ),
+                      WeakConceptsCard(concepts: dashboard.weakConcepts),
 
                       const SizedBox(height: 24),
 
                       RecentActivityCard(
-                        activities:
-                            dashboard.recentActivities,
+                        activities: dashboard.recentActivities,
                       ),
                     ],
                   );
@@ -264,9 +239,7 @@ class _DashboardContent extends StatelessWidget {
 class _ErrorView extends StatelessWidget {
   final VoidCallback onRetry;
 
-  const _ErrorView({
-    required this.onRetry,
-  });
+  const _ErrorView({required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -274,23 +247,15 @@ class _ErrorView extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
-            Icons.error_outline_rounded,
-            size: 48,
-          ),
+          const Icon(Icons.error_outline_rounded, size: 48),
 
           const SizedBox(height: 12),
 
-          const Text(
-            'Unable to load dashboard data.',
-          ),
+          const Text('Unable to load dashboard data.'),
 
           const SizedBox(height: 12),
 
-          FilledButton(
-            onPressed: onRetry,
-            child: const Text('Retry'),
-          ),
+          FilledButton(onPressed: onRetry, child: const Text('Retry')),
         ],
       ),
     );

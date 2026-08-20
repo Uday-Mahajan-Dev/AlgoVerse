@@ -7,18 +7,20 @@ import '../../domain/entities/teacher_dashboard_entity.dart';
 
 final teacherDashboardDataSourceProvider =
     Provider<TeacherDashboardMockDataSource>((ref) {
-  return TeacherDashboardMockDataSource();
-});
+      return TeacherDashboardMockDataSource();
+    });
 
-final teacherDashboardRepositoryProvider =
-    Provider<TeacherDashboardRepository>((ref) {
-  return TeacherDashboardRepositoryImpl(
-    dataSource: ref.watch(teacherDashboardDataSourceProvider),
-  );
-});
+final teacherDashboardRepositoryProvider = Provider<TeacherDashboardRepository>(
+  (ref) {
+    return TeacherDashboardRepositoryImpl(
+      dataSource: ref.watch(teacherDashboardDataSourceProvider),
+    );
+  },
+);
 
-final teacherDashboardProvider =
-    FutureProvider<TeacherDashboardData>((ref) async {
+final teacherDashboardProvider = FutureProvider<TeacherDashboardData>((
+  ref,
+) async {
   final repository = ref.watch(teacherDashboardRepositoryProvider);
 
   return repository.getDashboardData();

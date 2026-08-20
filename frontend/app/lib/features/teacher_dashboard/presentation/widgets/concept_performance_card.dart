@@ -5,10 +5,7 @@ import '../../domain/entities/teacher_dashboard_entity.dart';
 class ConceptPerformanceCard extends StatelessWidget {
   final List<ConceptPerformance> concepts;
 
-  const ConceptPerformanceCard({
-    super.key,
-    required this.concepts,
-  });
+  const ConceptPerformanceCard({super.key, required this.concepts});
 
   @override
   Widget build(BuildContext context) {
@@ -19,9 +16,7 @@ class ConceptPerformanceCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: theme.dividerColor.withValues(alpha: 0.15),
-        ),
+        border: Border.all(color: theme.dividerColor.withValues(alpha: 0.15)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -38,9 +33,18 @@ class ConceptPerformanceCard extends StatelessWidget {
             style: theme.textTheme.bodyMedium,
           ),
           const SizedBox(height: 24),
-          ...concepts.map(
-            (concept) => _ConceptRow(concept: concept),
-          ),
+          if (concepts.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                'No concept performance data available yet.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.textTheme.bodySmall?.color,
+                ),
+              ),
+            )
+          else
+            ...concepts.map((concept) => _ConceptRow(concept: concept)),
         ],
       ),
     );
@@ -50,9 +54,7 @@ class ConceptPerformanceCard extends StatelessWidget {
 class _ConceptRow extends StatelessWidget {
   final ConceptPerformance concept;
 
-  const _ConceptRow({
-    required this.concept,
-  });
+  const _ConceptRow({required this.concept});
 
   @override
   Widget build(BuildContext context) {

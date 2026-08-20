@@ -6,11 +6,7 @@ import 'features/teacher_dashboard/presentation/pages/teacher_dashboard_page.dar
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  runApp(
-    const ProviderScope(
-      child: TeacherDashboardTestApp(),
-    ),
-  );
+  runApp(const ProviderScope(child: TeacherDashboardTestApp()));
 }
 
 class TeacherDashboardTestApp extends StatelessWidget {
@@ -21,10 +17,7 @@ class TeacherDashboardTestApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'AlgoVerse Teacher Dashboard',
-      theme: ThemeData(
-        useMaterial3: true,
-        colorSchemeSeed: Colors.indigo,
-      ),
+      theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.indigo),
       home: const TeacherDashboardPage(),
     );
   }

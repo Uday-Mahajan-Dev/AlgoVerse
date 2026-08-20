@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../core/theme/app_theme.dart';
 import 'router.dart';
-import 'theme.dart';
 
 class AlgoVerseApp extends StatelessWidget {
   const AlgoVerseApp({super.key});

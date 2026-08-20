@@ -119,9 +119,7 @@ class _SidebarItem extends StatelessWidget {
       child: ListTile(
         onTap: onTap,
         selected: selected,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         leading: Icon(icon),
         title: Text(title),
       ),

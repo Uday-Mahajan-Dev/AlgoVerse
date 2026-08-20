@@ -23,9 +23,7 @@ class DashboardStatCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: theme.dividerColor.withValues(alpha: 0.15),
-        ),
+        border: Border.all(color: theme.dividerColor.withValues(alpha: 0.15)),
       ),
       child: Row(
         children: [
@@ -36,20 +34,14 @@ class DashboardStatCard extends StatelessWidget {
               color: theme.colorScheme.primary.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(
-              icon,
-              color: theme.colorScheme.primary,
-            ),
+            child: Icon(icon, color: theme.colorScheme.primary),
           ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: theme.textTheme.bodyMedium,
-                ),
+                Text(title, style: theme.textTheme.bodyMedium),
                 const SizedBox(height: 5),
                 Text(
                   value,
@@ -58,10 +50,7 @@ class DashboardStatCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 3),
-                Text(
-                  subtitle,
-                  style: theme.textTheme.bodySmall,
-                ),
+                Text(subtitle, style: theme.textTheme.bodySmall),
               ],
             ),
           ),

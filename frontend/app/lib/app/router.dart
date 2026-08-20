@@ -1,12 +1,14 @@
-﻿import 'package:go_router/go_router.dart';
+import 'package:go_router/go_router.dart';
 
 import '../core/constants/app_routes.dart';
+import '../core/storage/token_storage.dart';
 
 import '../features/splash/presentation/pages/splash_page.dart';
 import '../features/auth/presentation/pages/login_page.dart';
 import '../features/auth/presentation/pages/register_page.dart';
 import '../features/auth/presentation/pages/verify_email_page.dart';
-import '../features/home/presentation/pages/home_page.dart';
+import '../features/student/presentation/pages/student_dashboard_page.dart';
+import '../features/teacher_dashboard/presentation/pages/teacher_dashboard_page.dart';
 
 final appRouter = GoRouter(
   initialLocation: AppRoutes.splash,
@@ -38,7 +40,26 @@ final appRouter = GoRouter(
 
     GoRoute(
       path: AppRoutes.home,
-      builder: (context, state) => const HomePage(),
+      redirect: (context, state) async {
+        final role = await TokenStorage.getUserRole();
+        if (role == 'TEACHER') {
+          return AppRoutes.teacher;
+        }
+        return null;
+      },
+      builder: (context, state) => const StudentDashboardPage(),
+    ),
+
+    GoRoute(
+      path: AppRoutes.teacher,
+      redirect: (context, state) async {
+        final role = await TokenStorage.getUserRole();
+        if (role == 'STUDENT') {
+          return AppRoutes.home;
+        }
+        return null;
+      },
+      builder: (context, state) => const TeacherDashboardPage(),
     ),
   ],
 );

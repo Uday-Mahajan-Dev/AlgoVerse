@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_routes.dart';
@@ -53,9 +53,26 @@ class _LoginPageState extends State<LoginPage> {
 
       await _saveTokens(tokens);
 
+      final accessToken = tokens['access_token']?.toString();
+      String? role;
+
+      if (accessToken != null) {
+        try {
+          final user = await ApiClient.me(accessToken);
+          role = user['role_name']?.toString();
+          if (role != null) {
+            await TokenStorage.saveUserRole(role);
+          }
+        } catch (_) {}
+      }
+
       if (!mounted) return;
 
-      context.go(AppRoutes.home);
+      if (role == 'TEACHER') {
+        context.go(AppRoutes.teacher);
+      } else {
+        context.go(AppRoutes.home);
+      }
     } catch (e) {
       if (!mounted) return;
 
@@ -101,9 +118,26 @@ class _LoginPageState extends State<LoginPage> {
 
       await _saveTokens(tokens);
 
+      final accessToken = tokens['access_token']?.toString();
+      String? role;
+
+      if (accessToken != null) {
+        try {
+          final user = await ApiClient.me(accessToken);
+          role = user['role_name']?.toString();
+          if (role != null) {
+            await TokenStorage.saveUserRole(role);
+          }
+        } catch (_) {}
+      }
+
       if (!mounted) return;
 
-      context.go(AppRoutes.home);
+      if (role == 'TEACHER') {
+        context.go(AppRoutes.teacher);
+      } else {
+        context.go(AppRoutes.home);
+      }
     } catch (e) {
       if (!mounted) return;
 

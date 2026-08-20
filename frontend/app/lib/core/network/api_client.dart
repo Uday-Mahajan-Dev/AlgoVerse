@@ -182,4 +182,24 @@ class ApiClient {
 
     await _handleResponse(response);
   }
+
+  // ============================================================
+  // TEACHER DASHBOARD
+  // ============================================================
+
+  static Future<Map<String, dynamic>> getTeacherDashboard(
+    String accessToken,
+  ) async {
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/teacher/dashboard'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
 }

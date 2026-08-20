@@ -72,3 +72,31 @@ class UserRepository:
 
         db.delete(user)
         db.commit()
+
+    @staticmethod
+    def count_students(db: Session) -> int:
+        from sqlalchemy import func
+        from app.models.role import Role
+
+        return (
+            db.scalar(
+                select(func.count(User.id))
+                .join(Role)
+                .where(Role.name == "STUDENT")
+            )
+            or 0
+        )
+
+    @staticmethod
+    def count_active_students(db: Session) -> int:
+        from sqlalchemy import func
+        from app.models.role import Role
+
+        return (
+            db.scalar(
+                select(func.count(User.id))
+                .join(Role)
+                .where(Role.name == "STUDENT", User.is_active.is_(True))
+            )
+            or 0
+        )

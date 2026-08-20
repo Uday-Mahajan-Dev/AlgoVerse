@@ -12,10 +12,7 @@ class StudentDashboardTestApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'AlgoVerse Student Dashboard',
-      theme: ThemeData(
-        useMaterial3: true,
-        colorSchemeSeed: Colors.indigo,
-      ),
+      theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.indigo),
       home: const StudentDashboardPage(),
     );
   }
@@ -39,50 +36,37 @@ class StudentDashboardPage extends StatelessWidget {
               LevelXpCard(),
               SizedBox(height: 28),
 
-              SectionTitle(
-                title: 'CONTINUE YOUR JOURNEY',
-              ),
+              SectionTitle(title: 'CONTINUE YOUR JOURNEY'),
               SizedBox(height: 12),
 
               ContinueLearningCard(),
               SizedBox(height: 28),
 
-              SectionTitle(
-                title: 'DAILY MISSIONS',
-                action: 'VIEW ALL',
-              ),
+              SectionTitle(title: 'DAILY MISSIONS', action: 'VIEW ALL'),
               SizedBox(height: 12),
 
               DailyMissionsSection(),
               SizedBox(height: 28),
 
-              SectionTitle(
-                title: 'YOUR PERFORMANCE',
-              ),
+              SectionTitle(title: 'YOUR PERFORMANCE'),
               SizedBox(height: 12),
 
               PerformanceStatsSection(),
               SizedBox(height: 28),
 
-              SectionTitle(
-                title: 'NEXT ACHIEVEMENT',
-              ),
+              SectionTitle(title: 'NEXT ACHIEVEMENT'),
               SizedBox(height: 12),
 
               NextAchievementCard(),
               SizedBox(height: 28),
 
-              SectionTitle(
-                title: 'WEEKLY CHALLENGE',
-              ),
+              SectionTitle(title: 'WEEKLY CHALLENGE'),
               SizedBox(height: 12),
 
               WeeklyChallengeCard(),
               SizedBox(height: 28),
 
-              SectionTitle(
-                title: 'RECENT ACTIVITY',
-              ),
+              SectionTitle(title: 'RECENT ACTIVITY'),
               SizedBox(height: 12),
 
               RecentActivitySection(),
@@ -112,27 +96,19 @@ class DashboardHeader extends StatelessWidget {
             children: [
               Text(
                 'Welcome back, Student',
-                style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
               ),
               SizedBox(height: 6),
               Text(
                 'Continue building your problem-solving skills.',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey,
-                ),
+                style: TextStyle(fontSize: 14, color: Colors.grey),
               ),
             ],
           ),
         ),
         IconButton(
           onPressed: () {},
-          icon: const Icon(
-            Icons.notifications_none_outlined,
-          ),
+          icon: const Icon(Icons.notifications_none_outlined),
         ),
       ],
     );
@@ -147,11 +123,7 @@ class SectionTitle extends StatelessWidget {
   final String title;
   final String? action;
 
-  const SectionTitle({
-    super.key,
-    required this.title,
-    this.action,
-  });
+  const SectionTitle({super.key, required this.title, this.action});
 
   @override
   Widget build(BuildContext context) {
@@ -167,11 +139,7 @@ class SectionTitle extends StatelessWidget {
             ),
           ),
         ),
-        if (action != null)
-          TextButton(
-            onPressed: () {},
-            child: Text(action!),
-          ),
+        if (action != null) TextButton(onPressed: () {}, child: Text(action!)),
       ],
     );
   }
@@ -200,10 +168,7 @@ class LevelXpCard extends StatelessWidget {
         children: [
           const Row(
             children: [
-              Icon(
-                Icons.workspace_premium_outlined,
-                color: Colors.white,
-              ),
+              Icon(Icons.workspace_premium_outlined, color: Colors.white),
               SizedBox(width: 8),
               Text(
                 'CURRENT LEVEL',
@@ -245,9 +210,7 @@ class LevelXpCard extends StatelessWidget {
               value: progress,
               minHeight: 10,
               backgroundColor: Colors.white24,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                Colors.white,
-              ),
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
             ),
           ),
 
@@ -265,10 +228,7 @@ class LevelXpCard extends StatelessWidget {
               ),
               Text(
                 '220 XP TO NEXT LEVEL',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 12,
-                ),
+                style: TextStyle(color: Colors.white70, fontSize: 12),
               ),
             ],
           ),
@@ -291,19 +251,14 @@ class ContinueLearningCard extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
-        side: BorderSide(
-          color: Colors.grey.shade300,
-        ),
+        side: BorderSide(color: Colors.grey.shade300),
       ),
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(
-              Icons.menu_book_outlined,
-              size: 28,
-            ),
+            const Icon(Icons.menu_book_outlined, size: 28),
 
             const SizedBox(height: 16),
 
@@ -320,30 +275,21 @@ class ContinueLearningCard extends StatelessWidget {
 
             const Text(
               'Binary Trees',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
 
             const SizedBox(height: 16),
 
             const Text(
               '72% COMPLETE',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
             ),
 
             const SizedBox(height: 8),
 
             ClipRRect(
               borderRadius: BorderRadius.circular(20),
-              child: const LinearProgressIndicator(
-                value: 0.72,
-                minHeight: 8,
-              ),
+              child: const LinearProgressIndicator(value: 0.72, minHeight: 8),
             ),
 
             const SizedBox(height: 20),
@@ -352,9 +298,7 @@ class ContinueLearningCard extends StatelessWidget {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () {},
-                child: const Text(
-                  'CONTINUE LEARNING',
-                ),
+                child: const Text('CONTINUE LEARNING'),
               ),
             ),
           ],
@@ -434,9 +378,7 @@ class MissionCard extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
-        side: BorderSide(
-          color: Colors.grey.shade300,
-        ),
+        side: BorderSide(color: Colors.grey.shade300),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -449,10 +391,7 @@ class MissionCard extends StatelessWidget {
                 color: Colors.indigo.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(
-                icon,
-                color: Colors.indigo,
-              ),
+              child: Icon(icon, color: Colors.indigo),
             ),
 
             const SizedBox(width: 14),
@@ -497,9 +436,7 @@ class MissionCard extends StatelessWidget {
 
             Text(
               progressText,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
           ],
         ),
@@ -559,9 +496,7 @@ class StatCard extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
-        side: BorderSide(
-          color: Colors.grey.shade300,
-        ),
+        side: BorderSide(color: Colors.grey.shade300),
       ),
       child: Padding(
         padding: const EdgeInsets.all(18),
@@ -574,10 +509,7 @@ class StatCard extends StatelessWidget {
 
             Text(
               value,
-              style: const TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
             ),
 
             const SizedBox(height: 4),
@@ -611,17 +543,12 @@ class NextAchievementCard extends StatelessWidget {
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: Colors.indigo.withOpacity(0.4),
-        ),
+        border: Border.all(color: Colors.indigo.withOpacity(0.4)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(
-            Icons.military_tech_outlined,
-            size: 30,
-          ),
+          const Icon(Icons.military_tech_outlined, size: 30),
 
           const SizedBox(height: 18),
 
@@ -636,37 +563,27 @@ class NextAchievementCard extends StatelessWidget {
 
           const SizedBox(height: 6),
 
-          const Text(
-            'Solve 100 problems to unlock this achievement.',
-          ),
+          const Text('Solve 100 problems to unlock this achievement.'),
 
           const SizedBox(height: 20),
 
           const Text(
             '87 / 100 PROBLEMS',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(fontWeight: FontWeight.bold),
           ),
 
           const SizedBox(height: 10),
 
           ClipRRect(
             borderRadius: BorderRadius.circular(10),
-            child: const LinearProgressIndicator(
-              value: 0.87,
-              minHeight: 8,
-            ),
+            child: const LinearProgressIndicator(value: 0.87, minHeight: 8),
           ),
 
           const SizedBox(height: 12),
 
           const Text(
             '13 PROBLEMS TO UNLOCK',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
           ),
         ],
       ),
@@ -687,19 +604,14 @@ class WeeklyChallengeCard extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(22),
-        side: BorderSide(
-          color: Colors.grey.shade300,
-        ),
+        side: BorderSide(color: Colors.grey.shade300),
       ),
       child: Padding(
         padding: const EdgeInsets.all(22),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(
-              Icons.leaderboard_outlined,
-              size: 30,
-            ),
+            const Icon(Icons.leaderboard_outlined, size: 30),
 
             const SizedBox(height: 18),
 
@@ -714,9 +626,7 @@ class WeeklyChallengeCard extends StatelessWidget {
 
             const SizedBox(height: 8),
 
-            const Text(
-              'Solve 10 problems this week.',
-            ),
+            const Text('Solve 10 problems this week.'),
 
             const SizedBox(height: 20),
 
@@ -725,16 +635,9 @@ class WeeklyChallengeCard extends StatelessWidget {
               children: [
                 Text(
                   '7 / 10 COMPLETE',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontWeight: FontWeight.bold),
                 ),
-                Text(
-                  '200 XP',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                Text('200 XP', style: TextStyle(fontWeight: FontWeight.bold)),
               ],
             ),
 
@@ -742,10 +645,7 @@ class WeeklyChallengeCard extends StatelessWidget {
 
             ClipRRect(
               borderRadius: BorderRadius.circular(10),
-              child: const LinearProgressIndicator(
-                value: 0.7,
-                minHeight: 8,
-              ),
+              child: const LinearProgressIndicator(value: 0.7, minHeight: 8),
             ),
           ],
         ),
@@ -767,9 +667,7 @@ class RecentActivitySection extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
-        side: BorderSide(
-          color: Colors.grey.shade300,
-        ),
+        side: BorderSide(color: Colors.grey.shade300),
       ),
       child: const Column(
         children: [
@@ -816,18 +714,8 @@ class ActivityTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       leading: Icon(icon),
-      title: Text(
-        title,
-        style: const TextStyle(
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-      trailing: Text(
-        xp,
-        style: const TextStyle(
-          fontWeight: FontWeight.bold,
-        ),
-      ),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+      trailing: Text(xp, style: const TextStyle(fontWeight: FontWeight.bold)),
     );
   }
 }

@@ -5,10 +5,7 @@ import '../../domain/entities/teacher_dashboard_entity.dart';
 class RecentActivityCard extends StatelessWidget {
   final List<RecentActivity> activities;
 
-  const RecentActivityCard({
-    super.key,
-    required this.activities,
-  });
+  const RecentActivityCard({super.key, required this.activities});
 
   @override
   Widget build(BuildContext context) {
@@ -19,9 +16,7 @@ class RecentActivityCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: theme.dividerColor.withValues(alpha: 0.15),
-        ),
+        border: Border.all(color: theme.dividerColor.withValues(alpha: 0.15)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -33,29 +28,35 @@ class RecentActivityCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
-          ...activities.map(
-            (activity) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: CircleAvatar(
-                child: Text(
-                  activity.studentName.substring(0, 1),
+          if (activities.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                'No recent activity recorded.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.textTheme.bodySmall?.color,
                 ),
               ),
-              title: Text(
-                activity.studentName,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
+            )
+          else
+            ...activities.map(
+              (activity) => ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: CircleAvatar(
+                  child: Text(
+                    activity.studentName.isNotEmpty
+                        ? activity.studentName.substring(0, 1)
+                        : '?',
+                  ),
                 ),
-              ),
-              subtitle: Text(
-                '${activity.activity} • ${activity.topic}',
-              ),
-              trailing: Text(
-                activity.time,
-                style: theme.textTheme.bodySmall,
+                title: Text(
+                  activity.studentName,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: Text('${activity.activity} • ${activity.topic}'),
+                trailing: Text(activity.time, style: theme.textTheme.bodySmall),
               ),
             ),
-          ),
         ],
       ),
     );

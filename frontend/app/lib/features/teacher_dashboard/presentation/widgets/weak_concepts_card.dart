@@ -5,10 +5,7 @@ import '../../domain/entities/teacher_dashboard_entity.dart';
 class WeakConceptsCard extends StatelessWidget {
   final List<WeakConcept> concepts;
 
-  const WeakConceptsCard({
-    super.key,
-    required this.concepts,
-  });
+  const WeakConceptsCard({super.key, required this.concepts});
 
   @override
   Widget build(BuildContext context) {
@@ -19,9 +16,7 @@ class WeakConceptsCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: theme.dividerColor.withValues(alpha: 0.15),
-        ),
+        border: Border.all(color: theme.dividerColor.withValues(alpha: 0.15)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -38,36 +33,46 @@ class WeakConceptsCard extends StatelessWidget {
             style: theme.textTheme.bodyMedium,
           ),
           const SizedBox(height: 20),
-          ...concepts.map(
-            (concept) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: CircleAvatar(
-                backgroundColor:
-                    theme.colorScheme.error.withValues(alpha: 0.10),
-                child: Icon(
-                  Icons.warning_amber_rounded,
-                  color: theme.colorScheme.error,
-                  size: 20,
+          if (concepts.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                'No weak concepts identified.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.textTheme.bodySmall?.color,
                 ),
               ),
-              title: Text(
-                concept.concept,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
+            )
+          else
+            ...concepts.map(
+              (concept) => ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: CircleAvatar(
+                  backgroundColor: theme.colorScheme.error.withValues(
+                    alpha: 0.10,
+                  ),
+                  child: Icon(
+                    Icons.warning_amber_rounded,
+                    color: theme.colorScheme.error,
+                    size: 20,
+                  ),
                 ),
-              ),
-              subtitle: Text(
-                '${concept.affectedStudents} students need revision',
-              ),
-              trailing: Text(
-                '${(concept.mastery * 100).round()}%',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: theme.colorScheme.error,
+                title: Text(
+                  concept.concept,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: Text(
+                  '${concept.affectedStudents} students need revision',
+                ),
+                trailing: Text(
+                  '${(concept.mastery * 100).round()}%',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: theme.colorScheme.error,
+                  ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );

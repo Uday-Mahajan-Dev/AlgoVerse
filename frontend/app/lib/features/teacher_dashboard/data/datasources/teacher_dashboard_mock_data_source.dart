@@ -3,9 +3,7 @@ import '../../domain/entities/teacher_dashboard_entity.dart';
 
 class TeacherDashboardMockDataSource {
   Future<TeacherDashboardModel> getDashboardData() async {
-    await Future<void>.delayed(
-      const Duration(milliseconds: 400),
-    );
+    await Future<void>.delayed(const Duration(milliseconds: 400));
 
     return const TeacherDashboardModel(
       stats: TeacherDashboardStats(
@@ -52,21 +50,9 @@ class TeacherDashboardMockDataSource {
           mastery: 0.43,
           affectedStudents: 76,
         ),
-        WeakConcept(
-          concept: 'Graphs',
-          mastery: 0.49,
-          affectedStudents: 83,
-        ),
-        WeakConcept(
-          concept: 'Trees',
-          mastery: 0.58,
-          affectedStudents: 91,
-        ),
-        WeakConcept(
-          concept: 'Recursion',
-          mastery: 0.61,
-          affectedStudents: 68,
-        ),
+        WeakConcept(concept: 'Graphs', mastery: 0.49, affectedStudents: 83),
+        WeakConcept(concept: 'Trees', mastery: 0.58, affectedStudents: 91),
+        WeakConcept(concept: 'Recursion', mastery: 0.61, affectedStudents: 68),
       ],
       recentActivities: [
         RecentActivity(

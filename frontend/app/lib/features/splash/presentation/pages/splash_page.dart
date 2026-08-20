@@ -35,11 +35,20 @@ class _SplashPageState extends State<SplashPage> {
     }
 
     try {
-      await ApiClient.me(accessToken);
+      final user = await ApiClient.me(accessToken);
+      final role = user['role_name']?.toString();
+
+      if (role != null) {
+        await TokenStorage.saveUserRole(role);
+      }
 
       if (!mounted) return;
 
-      context.go(AppRoutes.home);
+      if (role == 'TEACHER') {
+        context.go(AppRoutes.teacher);
+      } else {
+        context.go(AppRoutes.home);
+      }
     } catch (_) {
       await TokenStorage.clear();
 
