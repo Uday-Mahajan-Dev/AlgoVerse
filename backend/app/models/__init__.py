@@ -10,3 +10,4 @@ from .course_module import CourseModule
 from .lesson import Lesson
 from .course_enrollment import CourseEnrollment
 from .lesson_completion import LessonCompletion
+from .student_lesson_activity import StudentLessonActivity

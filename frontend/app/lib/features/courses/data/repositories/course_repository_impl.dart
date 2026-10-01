@@ -36,4 +36,10 @@ class CourseRepositoryImpl implements CourseRepository {
   Future<Map<String, dynamic>> completeLesson(String lessonId) {
     return dataSource.completeLesson(lessonId);
   }
+
+  @override
+  Future<Map<String, dynamic>> recordLessonAccess(String lessonId) {
+    return dataSource.recordLessonAccess(lessonId);
+  }
 }
+

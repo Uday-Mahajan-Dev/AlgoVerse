@@ -22,3 +22,15 @@ final studentDashboardProvider =
   final repository = ref.watch(studentDashboardRepositoryProvider);
   return repository.getDashboardData();
 });
+
+final continueLearningProvider =
+    FutureProvider<ContinueLearningEntity?>((ref) async {
+  final repository = ref.watch(studentDashboardRepositoryProvider);
+  return repository.getContinueLearning();
+});
+
+final studentMetricsProvider =
+    FutureProvider<StudentMetricsEntity>((ref) async {
+  final repository = ref.watch(studentDashboardRepositoryProvider);
+  return repository.getStudentMetrics();
+});

@@ -199,3 +199,52 @@ class StudentDashboardModel extends StudentDashboardData {
     );
   }
 }
+
+class ContinueLearningModel extends ContinueLearningEntity {
+  const ContinueLearningModel({
+    required super.lessonId,
+    required super.lessonTitle,
+    required super.lessonSlug,
+    required super.courseTitle,
+    required super.courseSlug,
+    required super.moduleTitle,
+    required super.contentType,
+    required super.courseCompletionPct,
+  });
+
+  factory ContinueLearningModel.fromJson(Map<String, dynamic> json) {
+    return ContinueLearningModel(
+      lessonId: json['lesson_id']?.toString() ?? '',
+      lessonTitle: json['lesson_title']?.toString() ?? '',
+      lessonSlug: json['lesson_slug']?.toString() ?? '',
+      courseTitle: json['course_title']?.toString() ?? '',
+      courseSlug: json['course_slug']?.toString() ?? '',
+      moduleTitle: json['module_title']?.toString() ?? '',
+      contentType: json['content_type']?.toString() ?? 'CONCEPT',
+      courseCompletionPct:
+          (json['course_completion_pct'] as num?)?.toDouble() ?? 0.0,
+    );
+  }
+}
+
+class StudentMetricsModel extends StudentMetricsEntity {
+  const StudentMetricsModel({
+    required super.totalCoursesEnrolled,
+    required super.totalLessonsCompleted,
+    required super.totalVisualizationsCompleted,
+    required super.totalProblemsSolved,
+    required super.currentStreak,
+  });
+
+  factory StudentMetricsModel.fromJson(Map<String, dynamic> json) {
+    return StudentMetricsModel(
+      totalCoursesEnrolled: json['total_courses_enrolled'] as int? ?? 0,
+      totalLessonsCompleted: json['total_lessons_completed'] as int? ?? 0,
+      totalVisualizationsCompleted:
+          json['total_visualizations_completed'] as int? ?? 0,
+      totalProblemsSolved: json['total_problems_solved'] as int? ?? 0,
+      currentStreak: json['current_streak'] as int? ?? 0,
+    );
+  }
+}
+

@@ -24,6 +24,16 @@ class LessonViewPage extends ConsumerStatefulWidget {
 class _LessonViewPageState extends ConsumerState<LessonViewPage> {
   bool _isEnrolling = false;
   bool _isCompleting = false;
+  String? _lastRecordedLessonId;
+
+  void _recordAccess(String lessonId) {
+    if (_lastRecordedLessonId == lessonId) return;
+    _lastRecordedLessonId = lessonId;
+    Future.microtask(() {
+      if (!mounted) return;
+      ref.read(courseRepositoryProvider).recordLessonAccess(lessonId);
+    });
+  }
 
   Future<void> _enroll() async {
     if (_isEnrolling) return;
@@ -154,6 +164,9 @@ class _LessonViewPageState extends ConsumerState<LessonViewPage> {
         }
 
         if (targetLesson != null) {
+          if (course.isEnrolled) {
+            _recordAccess(targetLesson.id);
+          }
           final targetIndex = allLessons.indexOf(targetLesson);
           if (targetIndex > 0) {
             prevLesson = allLessons[targetIndex - 1];

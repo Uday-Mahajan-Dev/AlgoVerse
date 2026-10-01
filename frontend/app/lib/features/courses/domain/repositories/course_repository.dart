@@ -7,4 +7,5 @@ abstract class CourseRepository {
   Future<CourseProgressEntity> getCourseProgress(String slug);
   Future<List<CourseProgressEntity>> getMyAllProgress();
   Future<Map<String, dynamic>> completeLesson(String lessonId);
+  Future<Map<String, dynamic>> recordLessonAccess(String lessonId);
 }

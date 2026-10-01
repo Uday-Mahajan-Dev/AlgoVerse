@@ -13,4 +13,14 @@ class StudentDashboardRepositoryImpl implements StudentDashboardRepository {
   Future<StudentDashboardData> getDashboardData() {
     return dataSource.getDashboardData();
   }
+
+  @override
+  Future<ContinueLearningEntity?> getContinueLearning() {
+    return dataSource.getContinueLearning();
+  }
+
+  @override
+  Future<StudentMetricsEntity> getStudentMetrics() {
+    return dataSource.getStudentMetrics();
+  }
 }

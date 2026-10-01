@@ -9,6 +9,7 @@ abstract class CourseDataSource {
   Future<CourseProgressModel> getCourseProgress(String slug);
   Future<List<CourseProgressModel>> getMyAllProgress();
   Future<Map<String, dynamic>> completeLesson(String lessonId);
+  Future<Map<String, dynamic>> recordLessonAccess(String lessonId);
 }
 
 class CourseRemoteDataSource implements CourseDataSource {
@@ -90,5 +91,22 @@ class CourseRemoteDataSource implements CourseDataSource {
       accessToken: token,
       lessonId: lessonId,
     );
+  }
+
+  @override
+  Future<Map<String, dynamic>> recordLessonAccess(String lessonId) async {
+    final token = await TokenStorage.getAccessToken();
+    if (token == null || token.isEmpty) {
+      return {};
+    }
+
+    try {
+      return await ApiClient.recordLessonAccess(
+        accessToken: token,
+        lessonId: lessonId,
+      );
+    } catch (_) {
+      return {};
+    }
   }
 }

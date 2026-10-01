@@ -48,6 +48,51 @@ class StudentContinueLearning {
   });
 }
 
+class ContinueLearningEntity {
+  final String lessonId;
+  final String lessonTitle;
+  final String lessonSlug;
+  final String courseTitle;
+  final String courseSlug;
+  final String moduleTitle;
+  final String contentType;
+  final double courseCompletionPct;
+
+  const ContinueLearningEntity({
+    required this.lessonId,
+    required this.lessonTitle,
+    required this.lessonSlug,
+    required this.courseTitle,
+    required this.courseSlug,
+    required this.moduleTitle,
+    required this.contentType,
+    required this.courseCompletionPct,
+  });
+}
+
+class StudentMetricsEntity {
+  final int totalCoursesEnrolled;
+  final int totalLessonsCompleted;
+  final int totalVisualizationsCompleted;
+  final int totalProblemsSolved;
+  final int currentStreak;
+
+  const StudentMetricsEntity({
+    required this.totalCoursesEnrolled,
+    required this.totalLessonsCompleted,
+    required this.totalVisualizationsCompleted,
+    required this.totalProblemsSolved,
+    required this.currentStreak,
+  });
+
+  const StudentMetricsEntity.empty()
+      : totalCoursesEnrolled = 0,
+        totalLessonsCompleted = 0,
+        totalVisualizationsCompleted = 0,
+        totalProblemsSolved = 0,
+        currentStreak = 0;
+}
+
 class StudentDailyMission {
   final String number;
   final String title;

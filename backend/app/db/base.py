@@ -12,3 +12,4 @@ from app.models.course_module import CourseModule
 from app.models.lesson import Lesson
 from app.models.course_enrollment import CourseEnrollment
 from app.models.lesson_completion import LessonCompletion
+from app.models.student_lesson_activity import StudentLessonActivity

@@ -210,6 +210,42 @@ class ApiClient {
     return _handleResponse(response);
   }
 
+  static Future<Map<String, dynamic>?> getContinueLearning(
+    String accessToken,
+  ) async {
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/dashboard/continue-learning'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    if (response.statusCode == 204 || response.body.isEmpty) {
+      return null;
+    }
+
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> getStudentMetrics(
+    String accessToken,
+  ) async {
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/dashboard/metrics'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
   static Future<Map<String, dynamic>> getTeacherDashboard(
     String accessToken,
   ) async {
@@ -403,6 +439,23 @@ class ApiClient {
     final response = await http
         .post(
           Uri.parse('$baseUrl/lessons/$lessonId/complete'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> recordLessonAccess({
+    required String accessToken,
+    required String lessonId,
+  }) async {
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/lessons/$lessonId/access'),
           headers: {
             'Authorization': 'Bearer $accessToken',
             'Accept': 'application/json',

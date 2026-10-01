@@ -1,15 +1,26 @@
-from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from datetime import datetime, timedelta, timezone
+from uuid import UUID
+
+from sqlalchemy import desc, func, select
+from sqlalchemy.orm import Session, selectinload
 
 from app.core.enums import UserRole
+from app.models.course import Course
+from app.models.course_enrollment import CourseEnrollment
+from app.models.course_module import CourseModule
+from app.models.lesson import Lesson
+from app.models.lesson_completion import LessonCompletion
 from app.models.role import Role
+from app.models.student_lesson_activity import StudentLessonActivity
 from app.models.user import User
 from app.schemas.dashboard import (
     ConceptPerformance,
+    ContinueLearningResponse,
     StudentContinueLearning,
     StudentDailyMission,
     StudentDashboardResponse,
     StudentLevelXp,
+    StudentMetricsResponse,
     StudentNextAchievement,
     StudentPerformanceStats,
     StudentRecentActivity,
@@ -23,6 +34,301 @@ from app.schemas.dashboard import (
 
 
 class DashboardService:
+
+    @staticmethod
+    def _calculate_course_completion_pct(
+        db: Session,
+        student_id: UUID,
+        course_id: UUID,
+    ) -> float:
+        course = (
+            db.execute(
+                select(Course)
+                .where(Course.id == course_id)
+                .options(
+                    selectinload(Course.modules).selectinload(CourseModule.lessons)
+                )
+            )
+            .scalars()
+            .first()
+        )
+        if not course:
+            return 0.0
+
+        all_lesson_ids = [
+            lesson.id
+            for module in course.modules
+            for lesson in module.lessons
+        ]
+        if not all_lesson_ids:
+            return 0.0
+
+        completed_count = (
+            db.scalar(
+                select(func.count(LessonCompletion.id)).where(
+                    LessonCompletion.student_id == student_id,
+                    LessonCompletion.lesson_id.in_(all_lesson_ids),
+                )
+            )
+            or 0
+        )
+        return round((completed_count / len(all_lesson_ids)) * 100.0, 1)
+
+    @staticmethod
+    def get_continue_learning(
+        db: Session,
+        student_id: UUID,
+    ) -> ContinueLearningResponse | None:
+        """Resolve next lesson using 4 rigid priorities:
+        - Priority 1: Most recently accessed incomplete lesson in enrolled course.
+        - Priority 2: First incomplete lesson in earliest enrolled course (ordered by module & lesson order_index).
+        - Priority 3: Fall back to most recently completed course's last lesson if all completed.
+        - Priority 4: Return None if student is not enrolled in any course.
+        """
+        # Fetch all enrolled courses ordered by earliest enrollment
+        enrolled_courses = (
+            db.execute(
+                select(CourseEnrollment)
+                .where(CourseEnrollment.student_id == student_id)
+                .order_by(CourseEnrollment.enrolled_at.asc())
+            )
+            .scalars()
+            .all()
+        )
+
+        if not enrolled_courses:
+            # Priority 4: Not enrolled in any course
+            return None
+
+        enrolled_course_ids = [e.course_id for e in enrolled_courses]
+
+        completed_subquery = (
+            select(LessonCompletion.lesson_id)
+            .where(LessonCompletion.student_id == student_id)
+            .scalar_subquery()
+        )
+
+        # Priority 1: Most recently accessed incomplete lesson among enrolled courses
+        stmt_p1 = (
+            select(
+                StudentLessonActivity,
+                Lesson,
+                CourseModule,
+                Course,
+            )
+            .join(Lesson, StudentLessonActivity.lesson_id == Lesson.id)
+            .join(CourseModule, Lesson.module_id == CourseModule.id)
+            .join(Course, CourseModule.course_id == Course.id)
+            .where(
+                StudentLessonActivity.student_id == student_id,
+                Course.id.in_(enrolled_course_ids),
+                ~Lesson.id.in_(completed_subquery),
+            )
+            .order_by(desc(StudentLessonActivity.last_accessed_at))
+            .limit(1)
+        )
+
+        p1_result = db.execute(stmt_p1).first()
+        if p1_result:
+            _, lesson, module, course = p1_result
+            pct = DashboardService._calculate_course_completion_pct(
+                db=db,
+                student_id=student_id,
+                course_id=course.id,
+            )
+            return ContinueLearningResponse(
+                lesson_id=lesson.id,
+                lesson_title=lesson.title,
+                lesson_slug=lesson.slug,
+                course_title=course.title,
+                course_slug=course.slug,
+                module_title=module.title,
+                content_type=lesson.content_type,
+                course_completion_pct=pct,
+            )
+
+        # Priority 2: First incomplete lesson in earliest enrolled course
+        for enrollment in enrolled_courses:
+            course = (
+                db.execute(
+                    select(Course)
+                    .where(Course.id == enrollment.course_id)
+                    .options(
+                        selectinload(Course.modules).selectinload(CourseModule.lessons)
+                    )
+                )
+                .scalars()
+                .first()
+            )
+            if not course:
+                continue
+
+            all_lessons_in_course = [
+                lesson
+                for module in course.modules
+                for lesson in module.lessons
+            ]
+            if not all_lessons_in_course:
+                continue
+
+            all_lesson_ids = [l.id for l in all_lessons_in_course]
+            completed_ids = set(
+                db.execute(
+                    select(LessonCompletion.lesson_id).where(
+                        LessonCompletion.student_id == student_id,
+                        LessonCompletion.lesson_id.in_(all_lesson_ids),
+                    )
+                )
+                .scalars()
+                .all()
+            )
+
+            sorted_modules = sorted(course.modules, key=lambda m: m.order_index)
+            for m in sorted_modules:
+                sorted_lessons = sorted(m.lessons, key=lambda l: l.order_index)
+                for l in sorted_lessons:
+                    if l.id not in completed_ids:
+                        pct = round(
+                            (len(completed_ids) / len(all_lesson_ids)) * 100.0,
+                            1,
+                        )
+                        return ContinueLearningResponse(
+                            lesson_id=l.id,
+                            lesson_title=l.title,
+                            lesson_slug=l.slug,
+                            course_title=course.title,
+                            course_slug=course.slug,
+                            module_title=m.title,
+                            content_type=l.content_type,
+                            course_completion_pct=pct,
+                        )
+
+        # Priority 3: Fall back to most recently completed course's last lesson
+        last_completion = (
+            db.execute(
+                select(LessonCompletion, Lesson, CourseModule, Course)
+                .join(Lesson, LessonCompletion.lesson_id == Lesson.id)
+                .join(CourseModule, Lesson.module_id == CourseModule.id)
+                .join(Course, CourseModule.course_id == Course.id)
+                .where(
+                    LessonCompletion.student_id == student_id,
+                    Course.id.in_(enrolled_course_ids),
+                )
+                .order_by(desc(LessonCompletion.completed_at))
+                .limit(1)
+            )
+            .first()
+        )
+        if last_completion:
+            _, lesson, module, course = last_completion
+            return ContinueLearningResponse(
+                lesson_id=lesson.id,
+                lesson_title=lesson.title,
+                lesson_slug=lesson.slug,
+                course_title=course.title,
+                course_slug=course.slug,
+                module_title=module.title,
+                content_type=lesson.content_type,
+                course_completion_pct=100.0,
+            )
+
+        return None
+
+    @staticmethod
+    def get_student_metrics(
+        db: Session,
+        student_id: UUID,
+    ) -> StudentMetricsResponse:
+        """Compute real-time student learning metrics:
+        - Total enrolled courses
+        - Total completed lessons
+        - Total visualizations completed
+        - Total problems solved
+        - Continuous daily streak (UTC calendar days)
+        """
+        # 1. Total courses enrolled
+        total_courses = (
+            db.scalar(
+                select(func.count(CourseEnrollment.id)).where(
+                    CourseEnrollment.student_id == student_id
+                )
+            )
+            or 0
+        )
+
+        # 2. Total lessons completed
+        total_lessons = (
+            db.scalar(
+                select(func.count(LessonCompletion.id)).where(
+                    LessonCompletion.student_id == student_id
+                )
+            )
+            or 0
+        )
+
+        # 3. Total visualizations completed
+        total_visualizations = (
+            db.scalar(
+                select(func.count(LessonCompletion.id))
+                .join(Lesson, LessonCompletion.lesson_id == Lesson.id)
+                .where(
+                    LessonCompletion.student_id == student_id,
+                    Lesson.content_type == "VISUALIZATION",
+                )
+            )
+            or 0
+        )
+
+        # 4. Total problems solved
+        total_problems = (
+            db.scalar(
+                select(func.count(LessonCompletion.id))
+                .join(Lesson, LessonCompletion.lesson_id == Lesson.id)
+                .where(
+                    LessonCompletion.student_id == student_id,
+                    Lesson.content_type == "PROBLEM",
+                )
+            )
+            or 0
+        )
+
+        # 5. Streak calculation
+        # TODO: use student timezone from profile when available
+        # UTC calendar days are fine for now.
+        completion_dates_raw = (
+            db.execute(
+                select(func.date(LessonCompletion.completed_at))
+                .where(LessonCompletion.student_id == student_id)
+                .distinct()
+                .order_by(desc(func.date(LessonCompletion.completed_at)))
+            )
+            .scalars()
+            .all()
+        )
+
+        date_set = set(completion_dates_raw)
+        today = datetime.now(timezone.utc).date()
+        yesterday = today - timedelta(days=1)
+
+        streak = 0
+        if today in date_set:
+            curr = today
+            while curr in date_set:
+                streak += 1
+                curr -= timedelta(days=1)
+        elif yesterday in date_set:
+            curr = yesterday
+            while curr in date_set:
+                streak += 1
+                curr -= timedelta(days=1)
+
+        return StudentMetricsResponse(
+            total_courses_enrolled=total_courses,
+            total_lessons_completed=total_lessons,
+            total_visualizations_completed=total_visualizations,
+            total_problems_solved=total_problems,
+            current_streak=streak,
+        )
 
     @staticmethod
     def get_student_dashboard(
@@ -41,90 +347,127 @@ class DashboardService:
             avatar_url=user.avatar_url,
         )
 
-        level_xp = StudentLevelXp(
-            current_level=12,
-            current_xp=780,
-            next_level_xp=1000,
-            xp_to_next_level=220,
-            progress=0.78,
+        metrics = DashboardService.get_student_metrics(db=db, student_id=user.id)
+        continue_learning_res = DashboardService.get_continue_learning(
+            db=db,
+            student_id=user.id,
         )
 
-        continue_learning = StudentContinueLearning(
-            category="DATA STRUCTURES & ALGORITHMS",
-            topic="Binary Trees",
-            progress=0.72,
-            progress_text="72% COMPLETE",
+        # Dynamic XP & Level calculation
+        total_xp = metrics.total_lessons_completed * 50
+        current_level = max(1, (total_xp // 250) + 1)
+        level_base_xp = (current_level - 1) * 250
+        next_level_xp = current_level * 250
+        xp_in_level = total_xp - level_base_xp
+        xp_to_next_level = max(0, next_level_xp - total_xp)
+        progress = xp_in_level / 250.0
+
+        level_xp = StudentLevelXp(
+            current_level=current_level,
+            current_xp=total_xp,
+            next_level_xp=next_level_xp,
+            xp_to_next_level=xp_to_next_level,
+            progress=min(1.0, max(0.0, progress)),
         )
+
+        if continue_learning_res:
+            continue_learning = StudentContinueLearning(
+                category=continue_learning_res.course_title.upper(),
+                topic=continue_learning_res.lesson_title,
+                progress=continue_learning_res.course_completion_pct / 100.0,
+                progress_text=f"{continue_learning_res.course_completion_pct:.0f}% COMPLETE",
+            )
+        else:
+            continue_learning = StudentContinueLearning(
+                category="START YOUR JOURNEY",
+                topic="Explore DSA Courses",
+                progress=0.0,
+                progress_text="NOT STARTED",
+            )
 
         daily_missions = [
             StudentDailyMission(
                 number="01",
                 title="Solve 3 Problems",
-                progress_text="2 / 3",
-                progress=0.66,
+                progress_text=f"{min(3, metrics.total_problems_solved)} / 3",
+                progress=min(1.0, metrics.total_problems_solved / 3.0),
                 reward="50 XP",
                 icon="code",
             ),
             StudentDailyMission(
                 number="02",
-                title="Complete a Lesson",
-                progress_text="0 / 1",
-                progress=0.0,
+                title="Complete a Visualization",
+                progress_text=f"{min(1, metrics.total_visualizations_completed)} / 1",
+                progress=min(1.0, metrics.total_visualizations_completed / 1.0),
                 reward="30 XP",
                 icon="book",
             ),
             StudentDailyMission(
                 number="03",
-                title="Daily Challenge",
-                progress_text="AVAILABLE",
-                progress=0.0,
+                title="Maintain Daily Streak",
+                progress_text=f"{metrics.current_streak} DAY{'S' if metrics.current_streak != 1 else ''}",
+                progress=1.0 if metrics.current_streak > 0 else 0.0,
                 reward="75 XP",
                 icon="target",
             ),
         ]
 
         performance = StudentPerformanceStats(
-            day_streak=12,
-            total_xp=1240,
+            day_streak=metrics.current_streak,
+            total_xp=total_xp,
         )
 
         next_achievement = StudentNextAchievement(
             title="PROBLEM SOLVER",
-            description="Solve 100 problems to unlock this achievement.",
-            current_count=87,
-            target_count=100,
-            progress=0.87,
-            progress_text="87 / 100 PROBLEMS",
-            remaining_text="13 PROBLEMS TO UNLOCK",
+            description="Complete 10 interactive lessons to unlock this achievement.",
+            current_count=metrics.total_lessons_completed,
+            target_count=10,
+            progress=min(1.0, metrics.total_lessons_completed / 10.0),
+            progress_text=f"{metrics.total_lessons_completed} / 10 LESSONS",
+            remaining_text=f"{max(0, 10 - metrics.total_lessons_completed)} LESSONS TO UNLOCK",
         )
 
         weekly_challenge = StudentWeeklyChallenge(
             title="ALGORITHM SPRINT",
-            description="Solve 10 problems this week.",
-            current_count=7,
-            target_count=10,
+            description="Complete 5 lessons this week.",
+            current_count=min(5, metrics.total_lessons_completed),
+            target_count=5,
             reward="200 XP",
-            progress=0.7,
-            progress_text="7 / 10 COMPLETE",
+            progress=min(1.0, metrics.total_lessons_completed / 5.0),
+            progress_text=f"{min(5, metrics.total_lessons_completed)} / 5 COMPLETE",
         )
 
-        recent_activities = [
-            StudentRecentActivity(
-                title="Solved Two Sum",
-                xp="+20 XP",
-                icon="code",
-            ),
-            StudentRecentActivity(
-                title="Completed Arrays Basics",
-                xp="+30 XP",
-                icon="book",
-            ),
-            StudentRecentActivity(
-                title="Reached Level 12",
-                xp="+100 XP",
-                icon="badge",
-            ),
-        ]
+        # Recent activities dynamically from recent completions
+        recent_completions = (
+            db.execute(
+                select(LessonCompletion, Lesson)
+                .join(Lesson, LessonCompletion.lesson_id == Lesson.id)
+                .where(LessonCompletion.student_id == user.id)
+                .order_by(desc(LessonCompletion.completed_at))
+                .limit(5)
+            )
+            .all()
+        )
+
+        recent_activities: list[StudentRecentActivity] = []
+        for comp, lesson in recent_completions:
+            icon = "code" if lesson.content_type == "PROBLEM" else "book"
+            recent_activities.append(
+                StudentRecentActivity(
+                    title=f"Completed {lesson.title}",
+                    xp="+50 XP",
+                    icon=icon,
+                )
+            )
+
+        if not recent_activities:
+            recent_activities = [
+                StudentRecentActivity(
+                    title="Account Created",
+                    xp="+0 XP",
+                    icon="badge",
+                )
+            ]
 
         return StudentDashboardResponse(
             user=user_summary,
@@ -163,7 +506,6 @@ class DashboardService:
             )
             active_students = db.scalar(active_students_stmt) or 0
 
-        # Baseline classroom metrics fallback when DB is freshly initialized
         display_total_students = total_students if total_students > 0 else 120
         display_active_students = active_students if active_students > 0 else 87
 

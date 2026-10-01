@@ -10,6 +10,7 @@ from app.models.course_enrollment import CourseEnrollment
 from app.models.course_module import CourseModule
 from app.models.lesson import Lesson
 from app.models.lesson_completion import LessonCompletion
+from app.models.student_lesson_activity import StudentLessonActivity
 from app.schemas.courses import (
     CourseDetailResponse,
     CourseListResponse,
@@ -19,6 +20,7 @@ from app.schemas.courses import (
     LessonResponse,
     ModuleResponse,
 )
+from app.schemas.dashboard import LessonAccessResponse
 
 
 class CourseService:
@@ -493,3 +495,54 @@ class CourseService:
             completed_at=completion.completed_at,
             message="Lesson marked as complete",
         )
+
+    @staticmethod
+    def record_lesson_access(
+        db: Session,
+        student_id: UUID,
+        lesson_id: UUID,
+    ) -> LessonAccessResponse:
+        """Record or update student lesson access timestamp (idempotent)."""
+        lesson = (
+            db.execute(select(Lesson).where(Lesson.id == lesson_id))
+            .scalars()
+            .first()
+        )
+
+        if not lesson:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Lesson with ID '{lesson_id}' not found.",
+            )
+
+        activity = (
+            db.execute(
+                select(StudentLessonActivity).where(
+                    StudentLessonActivity.student_id == student_id,
+                    StudentLessonActivity.lesson_id == lesson_id,
+                )
+            )
+            .scalars()
+            .first()
+        )
+
+        now = datetime.now(timezone.utc)
+        if activity:
+            activity.last_accessed_at = now
+        else:
+            activity = StudentLessonActivity(
+                student_id=student_id,
+                lesson_id=lesson_id,
+                last_accessed_at=now,
+            )
+            db.add(activity)
+
+        db.commit()
+        db.refresh(activity)
+
+        return LessonAccessResponse(
+            lesson_id=lesson_id,
+            last_accessed_at=activity.last_accessed_at.isoformat(),
+            message="Lesson access recorded",
+        )
+

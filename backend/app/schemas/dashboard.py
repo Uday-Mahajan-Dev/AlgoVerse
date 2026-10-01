@@ -81,6 +81,31 @@ class StudentDashboardResponse(BaseModel):
     recent_activities: list[StudentRecentActivity]
 
 
+class ContinueLearningResponse(BaseModel):
+    lesson_id: UUID
+    lesson_title: str
+    lesson_slug: str
+    course_title: str
+    course_slug: str
+    module_title: str
+    content_type: str
+    course_completion_pct: float
+
+
+class StudentMetricsResponse(BaseModel):
+    total_courses_enrolled: int
+    total_lessons_completed: int
+    total_visualizations_completed: int
+    total_problems_solved: int
+    current_streak: int
+
+
+class LessonAccessResponse(BaseModel):
+    lesson_id: UUID
+    last_accessed_at: str
+    message: str = "Lesson access recorded"
+
+
 # ============================================================
 # TEACHER DASHBOARD SCHEMAS
 # ============================================================

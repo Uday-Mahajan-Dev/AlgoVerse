@@ -16,6 +16,7 @@ from app.schemas.courses import (
     EnrollmentResponse,
     LessonCompletionResponse,
 )
+from app.schemas.dashboard import LessonAccessResponse
 from app.services.course_service import CourseService
 
 router = APIRouter(tags=["courses"])
@@ -47,6 +48,40 @@ def get_my_all_progress(
     return CourseService.get_all_student_progress(
         db=db,
         student_id=current_student.id,
+    )
+
+
+@router.post(
+    "/lessons/{lesson_id}/access",
+    response_model=LessonAccessResponse,
+    summary="Record student lesson access timestamp (courses prefix)",
+)
+def access_lesson_courses(
+    lesson_id: UUID,
+    db: Session = Depends(get_db),
+    current_student: User = Depends(get_current_student),
+):
+    return CourseService.record_lesson_access(
+        db=db,
+        student_id=current_student.id,
+        lesson_id=lesson_id,
+    )
+
+
+@lesson_router.post(
+    "/lessons/{lesson_id}/access",
+    response_model=LessonAccessResponse,
+    summary="Record student lesson access timestamp",
+)
+def access_lesson_direct(
+    lesson_id: UUID,
+    db: Session = Depends(get_db),
+    current_student: User = Depends(get_current_student),
+):
+    return CourseService.record_lesson_access(
+        db=db,
+        student_id=current_student.id,
+        lesson_id=lesson_id,
     )
 
 
