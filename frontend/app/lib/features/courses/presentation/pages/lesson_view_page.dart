@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../learning/presentation/widgets/interactive_visualizer_workspace.dart';
 import '../../domain/entities/course_entity.dart';
 import '../providers/course_provider.dart';
+
 
 class LessonViewPage extends ConsumerStatefulWidget {
   final String courseSlug;
@@ -504,7 +506,7 @@ class _LessonContentRenderer extends StatelessWidget {
   Widget build(BuildContext context) {
     switch (contentType.toUpperCase()) {
       case 'VISUALIZATION':
-        return _VisualizationContent(contentJson: contentJson);
+        return InteractiveVisualizerWorkspace(contentJson: contentJson);
       case 'PROBLEM':
         return _ProblemContent(contentJson: contentJson);
       case 'CONCEPT':
@@ -530,6 +532,9 @@ class _ConceptContent extends StatelessWidget {
     final complexity = contentJson['complexity'] is Map
         ? Map<String, dynamic>.from(contentJson['complexity'] as Map)
         : null;
+    final analogy = contentJson['real_world_analogy']?.toString();
+    final advantages = contentJson['advantages'] as List<dynamic>? ?? [];
+    final disadvantages = contentJson['disadvantages'] as List<dynamic>? ?? [];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -549,6 +554,52 @@ class _ConceptContent extends StatelessWidget {
                 fontSize: 14,
                 height: 1.5,
               ),
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
+
+        if (analogy != null && analogy.isNotEmpty) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.amber.shade50,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.amber.shade200),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.lightbulb_outline_rounded,
+                    color: Colors.amber.shade900, size: 22),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'REAL-WORLD ANALOGY',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1,
+                          color: Colors.amber.shade900,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        analogy,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.amber.shade900,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 20),
@@ -649,127 +700,86 @@ class _ConceptContent extends StatelessWidget {
               );
             }).toList(),
           ),
+          const SizedBox(height: 20),
         ],
-      ],
-    );
-  }
-}
 
-//
-// VISUALIZATION RENDERER
-//
-class _VisualizationContent extends StatelessWidget {
-  final Map<String, dynamic> contentJson;
-
-  const _VisualizationContent({required this.contentJson});
-
-  @override
-  Widget build(BuildContext context) {
-    final description = contentJson['description']?.toString() ??
-        'Interactive Step-by-Step Visualizer';
-    final visualizerType = contentJson['visualizer_type']?.toString() ?? 'Generic';
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.purple.shade900, Colors.purple.shade700],
-            ),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Column(
+        if (advantages.isNotEmpty || disadvantages.isNotEmpty) ...[
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
+              if (advantages.isNotEmpty)
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: Colors.white24,
-                      borderRadius: BorderRadius.circular(10),
+                      color: Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: Colors.green.shade200),
                     ),
-                    child: const Icon(
-                      Icons.insights_rounded,
-                      color: Colors.white,
-                      size: 22,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'ADVANTAGES',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green.shade800,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        ...advantages.map((a) => Padding(
+                              padding: const EdgeInsets.only(bottom: 4),
+                              child: Text(
+                                '• $a',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.green.shade900,
+                                ),
+                              ),
+                            )),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Text(
-                    'Interactive Canvas: $visualizerType',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                ),
+              if (advantages.isNotEmpty && disadvantages.isNotEmpty)
+                const SizedBox(width: 12),
+              if (disadvantages.isNotEmpty)
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: Colors.red.shade200),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'DISADVANTAGES',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.red.shade800,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        ...disadvantages.map((d) => Padding(
+                              padding: const EdgeInsets.only(bottom: 4),
+                              child: Text(
+                                '• $d',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.red.shade900,
+                                ),
+                              ),
+                            )),
+                      ],
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              Text(
-                description,
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 13,
-                  height: 1.4,
                 ),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.white12,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Text(
-                  '⚡ Visualizer Sandbox Engine Ready for Phase D Integration',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
             ],
-          ),
-        ),
-        const SizedBox(height: 20),
-
-        // Initial Data Preview
-        if (contentJson['initial_array'] != null ||
-            contentJson['initial_tree'] != null) ...[
-          const Text(
-            'INITIAL STATE CONFIGURATION',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.1,
-              color: Colors.purple,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.purple.shade50,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.purple.shade200),
-            ),
-            child: Text(
-              contentJson['initial_array'] != null
-                  ? 'Array: ${contentJson['initial_array']}'
-                  : 'Tree Root: ${contentJson['initial_tree']}',
-              style: const TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
           ),
         ],
       ],
@@ -791,6 +801,11 @@ class _ProblemContent extends StatelessWidget {
         contentJson['problem_statement']?.toString() ?? '';
     final rawExamples = contentJson['examples'] as List<dynamic>? ?? [];
     final rawConstraints = contentJson['constraints'] as List<dynamic>? ?? [];
+    final starterCode = contentJson['starter_code']?.toString();
+    final hint = contentJson['hint']?.toString() ??
+        (contentJson['hints'] is List && (contentJson['hints'] as List).isNotEmpty
+            ? (contentJson['hints'] as List).first.toString()
+            : null);
     final difficulty = contentJson['difficulty']?.toString() ?? 'MEDIUM';
 
     return Column(
@@ -926,6 +941,85 @@ class _ProblemContent extends StatelessWidget {
               ),
             );
           }),
+          const SizedBox(height: 20),
+        ],
+
+        // Starter Code
+        if (starterCode != null && starterCode.isNotEmpty) ...[
+          const Text(
+            'STARTER CODE TEMPLATE',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.1,
+              color: Colors.orange,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E1E2E),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Text(
+              starterCode,
+              style: const TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 13,
+                color: Color(0xFFCDD6F4),
+                height: 1.4,
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
+
+        // Hint Box
+        if (hint != null && hint.isNotEmpty) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.blue.shade200),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.help_outline_rounded,
+                    color: Colors.blue.shade800, size: 22),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'HINT',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1,
+                          color: Colors.blue.shade900,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        hint,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.blue.shade900,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ],
     );
