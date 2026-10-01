@@ -11,3 +11,6 @@ from .lesson import Lesson
 from .course_enrollment import CourseEnrollment
 from .lesson_completion import LessonCompletion
 from .student_lesson_activity import StudentLessonActivity
+from .problem import Problem
+from .test_case import TestCase
+from .submission import Submission

@@ -69,6 +69,12 @@ class Settings(BaseSettings):
     FIREBASE_CREDENTIALS_PATH: str = "firebase-service-account.json"
 
     # ==========================================
+    # Code Execution Engine (Judge0)
+    # ==========================================
+
+    JUDGE0_API_URL: str = "http://localhost:2358"
+
+    # ==========================================
     # Settings
     # ==========================================
 

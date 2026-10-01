@@ -13,3 +13,6 @@ from app.models.lesson import Lesson
 from app.models.course_enrollment import CourseEnrollment
 from app.models.lesson_completion import LessonCompletion
 from app.models.student_lesson_activity import StudentLessonActivity
+from app.models.problem import Problem
+from app.models.test_case import TestCase
+from app.models.submission import Submission

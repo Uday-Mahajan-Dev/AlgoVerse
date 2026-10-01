@@ -467,6 +467,92 @@ class ApiClient {
   }
 
   // ============================================================
+  // CODING PROBLEMS & JUDGE EXECUTION
+  // ============================================================
+
+  static Future<Map<String, dynamic>> getProblemForLesson({
+    required String accessToken,
+    required String lessonSlug,
+  }) async {
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/problems/lesson/$lessonSlug'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> runProblemTrial({
+    required String accessToken,
+    required String problemId,
+    required String code,
+    required String language,
+  }) async {
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/problems/$problemId/run'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: jsonEncode({
+            'code': code,
+            'language': language,
+          }),
+        )
+        .timeout(const Duration(seconds: 20));
+
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> submitProblemSolution({
+    required String accessToken,
+    required String problemId,
+    required String code,
+    required String language,
+  }) async {
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/problems/$problemId/submit'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: jsonEncode({
+            'code': code,
+            'language': language,
+          }),
+        )
+        .timeout(const Duration(seconds: 30));
+
+    return _handleResponse(response);
+  }
+
+  static Future<List<dynamic>> getProblemSubmissions({
+    required String accessToken,
+    required String problemId,
+  }) async {
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/problems/$problemId/submissions'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleListResponse(response);
+  }
+
+  // ============================================================
   // LOGOUT
   // ============================================================
 

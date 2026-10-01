@@ -61,3 +61,11 @@ class Lesson(BaseModel):
         back_populates="lesson",
         cascade="all, delete-orphan",
     )
+
+    problem = relationship(
+        "Problem",
+        back_populates="lesson",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+

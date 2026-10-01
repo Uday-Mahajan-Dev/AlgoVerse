@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../learning/presentation/widgets/interactive_visualizer_workspace.dart';
+import '../../../problems/presentation/widgets/problem_workspace_widget.dart';
 import '../../domain/entities/course_entity.dart';
 import '../providers/course_provider.dart';
 
@@ -274,6 +275,11 @@ class _LessonViewPageState extends ConsumerState<LessonViewPage> {
                           _LessonContentRenderer(
                             contentType: targetLesson.contentType,
                             contentJson: targetLesson.contentJson,
+                            lessonSlug: targetLesson.slug,
+                            onLessonCompleted: () {
+                              ref.invalidate(courseDetailProvider(widget.courseSlug));
+                              ref.invalidate(allStudentProgressProvider);
+                            },
                           ),
                         ],
                       ],
@@ -509,10 +515,14 @@ class _EnrollToAccessCta extends StatelessWidget {
 class _LessonContentRenderer extends StatelessWidget {
   final String contentType;
   final Map<String, dynamic> contentJson;
+  final String lessonSlug;
+  final VoidCallback? onLessonCompleted;
 
   const _LessonContentRenderer({
     required this.contentType,
     required this.contentJson,
+    required this.lessonSlug,
+    this.onLessonCompleted,
   });
 
   @override
@@ -521,7 +531,10 @@ class _LessonContentRenderer extends StatelessWidget {
       case 'VISUALIZATION':
         return InteractiveVisualizerWorkspace(contentJson: contentJson);
       case 'PROBLEM':
-        return _ProblemContent(contentJson: contentJson);
+        return ProblemWorkspaceWidget(
+          lessonSlug: lessonSlug,
+          onLessonCompleted: onLessonCompleted,
+        );
       case 'CONCEPT':
       default:
         return _ConceptContent(contentJson: contentJson);
@@ -800,241 +813,4 @@ class _ConceptContent extends StatelessWidget {
   }
 }
 
-//
-// PROBLEM RENDERER
-//
-class _ProblemContent extends StatelessWidget {
-  final Map<String, dynamic> contentJson;
 
-  const _ProblemContent({required this.contentJson});
-
-  @override
-  Widget build(BuildContext context) {
-    final problemStatement =
-        contentJson['problem_statement']?.toString() ?? '';
-    final rawExamples = contentJson['examples'] as List<dynamic>? ?? [];
-    final rawConstraints = contentJson['constraints'] as List<dynamic>? ?? [];
-    final starterCode = contentJson['starter_code']?.toString();
-    final hint = contentJson['hint']?.toString() ??
-        (contentJson['hints'] is List && (contentJson['hints'] as List).isNotEmpty
-            ? (contentJson['hints'] as List).first.toString()
-            : null);
-    final difficulty = contentJson['difficulty']?.toString() ?? 'MEDIUM';
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Difficulty badge
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: Colors.orange.shade100,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            'DIFFICULTY: $difficulty',
-            style: TextStyle(
-              color: Colors.orange.shade900,
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 0.8,
-            ),
-          ),
-        ),
-        const SizedBox(height: 14),
-
-        // Statement
-        if (problemStatement.isNotEmpty) ...[
-          const Text(
-            'PROBLEM STATEMENT',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.1,
-              color: Colors.orange,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            problemStatement,
-            style: const TextStyle(
-              fontSize: 14,
-              height: 1.5,
-            ),
-          ),
-          const SizedBox(height: 20),
-        ],
-
-        // Examples
-        if (rawExamples.isNotEmpty) ...[
-          const Text(
-            'EXAMPLES & TESTCASES',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.1,
-              color: Colors.orange,
-            ),
-          ),
-          const SizedBox(height: 10),
-          ...rawExamples.map((ex) {
-            final exMap = ex is Map ? ex : {};
-            return Container(
-              width: double.infinity,
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (exMap['input'] != null)
-                    Text(
-                      'Input: ${exMap['input']}',
-                      style: const TextStyle(
-                        fontFamily: 'monospace',
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                      ),
-                    ),
-                  if (exMap['output'] != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      'Output: ${exMap['output']}',
-                      style: const TextStyle(
-                        fontFamily: 'monospace',
-                        fontWeight: FontWeight.w600,
-                        color: Colors.indigo,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                  if (exMap['explanation'] != null) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      'Explanation: ${exMap['explanation']}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade700,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            );
-          }),
-          const SizedBox(height: 20),
-        ],
-
-        // Constraints
-        if (rawConstraints.isNotEmpty) ...[
-          const Text(
-            'CONSTRAINTS',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.1,
-              color: Colors.orange,
-            ),
-          ),
-          const SizedBox(height: 8),
-          ...rawConstraints.map((c) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Text(
-                '• ${c.toString()}',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontFamily: 'monospace',
-                  color: Colors.grey.shade800,
-                ),
-              ),
-            );
-          }),
-          const SizedBox(height: 20),
-        ],
-
-        // Starter Code
-        if (starterCode != null && starterCode.isNotEmpty) ...[
-          const Text(
-            'STARTER CODE TEMPLATE',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.1,
-              color: Colors.orange,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E1E2E),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Text(
-              starterCode,
-              style: const TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 13,
-                color: Color(0xFFCDD6F4),
-                height: 1.4,
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-        ],
-
-        // Hint Box
-        if (hint != null && hint.isNotEmpty) ...[
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.blue.shade50,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.blue.shade200),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.help_outline_rounded,
-                    color: Colors.blue.shade800, size: 22),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'HINT',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1,
-                          color: Colors.blue.shade900,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        hint,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.blue.shade900,
-                          height: 1.4,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-}
