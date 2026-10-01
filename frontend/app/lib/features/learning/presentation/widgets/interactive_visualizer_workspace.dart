@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../domain/entities/execution_trace.dart';
 import '../../engine/array_algorithm_executor.dart';
+import 'ai_tutor_panel.dart';
 import 'array_visualizer_widget.dart';
 import 'code_viewer_widget.dart';
 import 'input_customizer.dart';
@@ -11,10 +12,12 @@ import 'visualizer_controls.dart';
 
 class InteractiveVisualizerWorkspace extends StatefulWidget {
   final Map<String, dynamic> contentJson;
+  final String? lessonId;
 
   const InteractiveVisualizerWorkspace({
     super.key,
     required this.contentJson,
+    this.lessonId,
   });
 
   @override
@@ -32,6 +35,7 @@ class _InteractiveVisualizerWorkspaceState
   bool _isPlaying = false;
   double _playbackSpeed = 1.0;
   Timer? _playbackTimer;
+  bool _showAITutor = false;
 
   @override
   void initState() {
@@ -214,7 +218,7 @@ class _InteractiveVisualizerWorkspaceState
         ? List<String>.from(widget.contentJson['algorithm_names'] as List)
         : <String>[];
 
-    return Column(
+    final mainWorkspace = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Meta header row: Complexity & LeetCode Ref
@@ -384,6 +388,70 @@ class _InteractiveVisualizerWorkspaceState
           onApply: _handleCustomInput,
         ),
       ],
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth > 920;
+
+        return Stack(
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: mainWorkspace),
+                if (_showAITutor && isWide) ...[
+                  const SizedBox(width: 16),
+                  AITutorPanel(
+                    lessonId: widget.lessonId ?? '',
+                    getVisualizationState: () => currentStep?.toJson(
+                      algorithmName: _selectedAlgorithm,
+                    ),
+                    onClose: () => setState(() => _showAITutor = false),
+                  ),
+                ],
+              ],
+            ),
+
+            // Slide-over on smaller screens
+            if (_showAITutor && !isWide)
+              Positioned(
+                top: 0,
+                bottom: 0,
+                right: 0,
+                child: AITutorPanel(
+                  lessonId: widget.lessonId ?? '',
+                  getVisualizationState: () => currentStep?.toJson(
+                    algorithmName: _selectedAlgorithm,
+                  ),
+                  onClose: () => setState(() => _showAITutor = false),
+                ),
+              ),
+
+            // Floating AI Tutor Trigger Button
+            Positioned(
+              bottom: 16,
+              right: 16,
+              child: FloatingActionButton.extended(
+                heroTag: 'ai_tutor_viz_fab',
+                onPressed: () {
+                  setState(() {
+                    _showAITutor = !_showAITutor;
+                  });
+                },
+                backgroundColor: const Color(0xFF6366F1),
+                foregroundColor: Colors.white,
+                elevation: 6,
+                icon: const Text('🤖', style: TextStyle(fontSize: 18)),
+                label: Text(
+                  _showAITutor ? 'Hide AI Tutor' : 'Ask AI Tutor',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

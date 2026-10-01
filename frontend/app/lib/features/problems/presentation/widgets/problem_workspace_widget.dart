@@ -2,16 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../learning/presentation/widgets/ai_tutor_panel.dart';
 import '../../domain/entities/problem.dart';
 import '../providers/problem_provider.dart';
 
 class ProblemWorkspaceWidget extends ConsumerStatefulWidget {
   final String lessonSlug;
+  final String? lessonId;
   final VoidCallback? onLessonCompleted;
 
   const ProblemWorkspaceWidget({
     super.key,
     required this.lessonSlug,
+    this.lessonId,
     this.onLessonCompleted,
   });
 
@@ -25,6 +28,7 @@ class _ProblemWorkspaceWidgetState
   late final TextEditingController _codeController;
   int _activeViewTab = 0; // 0 = Workspace, 1 = Submissions
   int _lineCount = 1;
+  bool _showAITutor = false;
 
   @override
   void initState() {
@@ -123,7 +127,7 @@ class _ProblemWorkspaceWidgetState
         ),
       ),
       data: (problem) {
-        return Column(
+        final mainProblemWorkspace = Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Top Navigation & Language Selector Bar
@@ -150,6 +154,96 @@ class _ProblemWorkspaceWidgetState
               _buildSubmissionsHistory(context, state, notifier, problem.id),
             ],
           ],
+        );
+
+        final targetLessonId = widget.lessonId ?? problem.lessonId;
+        final hasFailedSub = state.submissionResult != null &&
+            state.submissionResult!.verdict != 'AC';
+
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final isWide = constraints.maxWidth > 920;
+
+            return Stack(
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: mainProblemWorkspace),
+                    if (_showAITutor && isWide) ...[
+                      const SizedBox(width: 16),
+                      AITutorPanel(
+                        lessonId: targetLessonId,
+                        submissionId: state.submissionResult?.submissionId,
+                        getCode: () => _codeController.text,
+                        getErrorInfo: () {
+                          if (state.submissionResult != null) {
+                            return 'Verdict: ${state.submissionResult!.verdict}, Passed ${state.submissionResult!.passedCount}/${state.submissionResult!.totalCount} tests. Details: ${state.submissionResult!.message}';
+                          }
+                          return null;
+                        },
+                        onClose: () => setState(() => _showAITutor = false),
+                      ),
+                    ],
+                  ],
+                ),
+
+                // Slide-over for smaller screens
+                if (_showAITutor && !isWide)
+                  Positioned(
+                    top: 0,
+                    bottom: 0,
+                    right: 0,
+                    child: AITutorPanel(
+                      lessonId: targetLessonId,
+                      submissionId: state.submissionResult?.submissionId,
+                      getCode: () => _codeController.text,
+                      getErrorInfo: () {
+                        if (state.submissionResult != null) {
+                          return 'Verdict: ${state.submissionResult!.verdict}, Passed ${state.submissionResult!.passedCount}/${state.submissionResult!.totalCount} tests. Details: ${state.submissionResult!.message}';
+                        }
+                        return null;
+                      },
+                      onClose: () => setState(() => _showAITutor = false),
+                    ),
+                  ),
+
+                // Floating AI Tutor Action Button
+                Positioned(
+                  bottom: 16,
+                  right: 16,
+                  child: FloatingActionButton.extended(
+                    heroTag: 'ai_tutor_problem_fab',
+                    onPressed: () {
+                      setState(() {
+                        _showAITutor = !_showAITutor;
+                      });
+                    },
+                    backgroundColor: hasFailedSub
+                        ? Colors.orange.shade700
+                        : const Color(0xFF6366F1),
+                    foregroundColor: Colors.white,
+                    elevation: 6,
+                    icon: Text(
+                      hasFailedSub ? '🔍' : '🤖',
+                      style: const TextStyle(fontSize: 18),
+                    ),
+                    label: Text(
+                      _showAITutor
+                          ? 'Hide AI Tutor'
+                          : (hasFailedSub
+                              ? 'Explain Error (AI)'
+                              : 'Ask AI Tutor'),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
         );
       },
     );

@@ -6,6 +6,8 @@ import '../../../../core/constants/app_routes.dart';
 import '../../../../core/storage/token_storage.dart';
 import '../../../courses/domain/entities/course_entity.dart';
 import '../../../courses/presentation/providers/course_provider.dart';
+import '../../../learning/domain/entities/ai_tutor_entity.dart';
+import '../../../learning/presentation/providers/ai_tutor_provider.dart';
 import '../../../teacher_dashboard/domain/entities/teacher_analytics_entity.dart';
 import '../../../teacher_dashboard/presentation/providers/teacher_analytics_provider.dart';
 import '../../../teachers/domain/entities/teacher_entity.dart';
@@ -82,6 +84,7 @@ class _StudentDashboardPageState extends ConsumerState<StudentDashboardPage> {
     final myTeacherAsync = ref.watch(myTeacherProvider);
     final progressAsync = ref.watch(allStudentProgressProvider);
     final studentAssignmentsAsync = ref.watch(studentAssignmentsProvider);
+    final aiRecommendationsAsync = ref.watch(aiRecommendationsProvider);
 
     return Scaffold(
       body: SafeArea(
@@ -155,6 +158,11 @@ class _StudentDashboardPageState extends ConsumerState<StudentDashboardPage> {
                   const SectionTitle(title: 'YOUR HOMEWORK & ASSIGNMENTS'),
                   const SizedBox(height: 12),
                   StudentHomeworkSection(assignmentsAsync: studentAssignmentsAsync),
+                  const SizedBox(height: 28),
+
+                  const SectionTitle(title: '🤖 AI RECOMMENDED FOR YOU'),
+                  const SizedBox(height: 12),
+                  AIRecommendationsSection(recsAsync: aiRecommendationsAsync),
                   const SizedBox(height: 28),
 
                   const SectionTitle(title: 'YOUR PERFORMANCE'),
@@ -1695,6 +1703,182 @@ class StudentHomeworkSection extends StatelessWidget {
                           fontSize: 13,
                         ),
                       ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class AIRecommendationsSection extends StatelessWidget {
+  final AsyncValue<List<AIRecommendationEntity>> recsAsync;
+
+  const AIRecommendationsSection({
+    super.key,
+    required this.recsAsync,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return recsAsync.when(
+      loading: () => const Center(
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: CircularProgressIndicator(),
+        ),
+      ),
+      error: (error, _) => Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.info_outline_rounded, color: Colors.indigo, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'AI mentorship recommendations will appear here as you practice.',
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+              ),
+            ),
+          ],
+        ),
+      ),
+      data: (recs) {
+        if (recs.isEmpty) {
+          return Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.auto_awesome, color: Colors.amber, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Great progress! Check back later for personalized AI problem recommendations.',
+                    style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: recs.length,
+          separatorBuilder: (_, _) => const SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            final rec = recs[index];
+            Color priorityColor;
+            switch (rec.priority.toLowerCase()) {
+              case 'high':
+                priorityColor = Colors.red.shade600;
+                break;
+              case 'medium':
+                priorityColor = Colors.amber.shade700;
+                break;
+              default:
+                priorityColor = Colors.blue.shade600;
+            }
+
+            return Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: priorityColor.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Icon(
+                        Icons.lightbulb_outline_rounded,
+                        color: priorityColor,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                rec.lessonTitle,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 7, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: priorityColor.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                '${rec.priority.toUpperCase()} PRIORITY',
+                                style: TextStyle(
+                                  color: priorityColor,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 9,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          rec.reason,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Course: ${rec.courseTitle}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey.shade500,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],

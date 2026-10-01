@@ -273,6 +273,7 @@ class _LessonViewPageState extends ConsumerState<LessonViewPage> {
                         ] else ...[
                           // Render content_json based on contentType
                           _LessonContentRenderer(
+                            lessonId: targetLesson.id,
                             contentType: targetLesson.contentType,
                             contentJson: targetLesson.contentJson,
                             lessonSlug: targetLesson.slug,
@@ -513,12 +514,14 @@ class _EnrollToAccessCta extends StatelessWidget {
 }
 
 class _LessonContentRenderer extends StatelessWidget {
+  final String? lessonId;
   final String contentType;
   final Map<String, dynamic> contentJson;
   final String lessonSlug;
   final VoidCallback? onLessonCompleted;
 
   const _LessonContentRenderer({
+    this.lessonId,
     required this.contentType,
     required this.contentJson,
     required this.lessonSlug,
@@ -529,9 +532,13 @@ class _LessonContentRenderer extends StatelessWidget {
   Widget build(BuildContext context) {
     switch (contentType.toUpperCase()) {
       case 'VISUALIZATION':
-        return InteractiveVisualizerWorkspace(contentJson: contentJson);
+        return InteractiveVisualizerWorkspace(
+          lessonId: lessonId,
+          contentJson: contentJson,
+        );
       case 'PROBLEM':
         return ProblemWorkspaceWidget(
+          lessonId: lessonId,
           lessonSlug: lessonSlug,
           onLessonCompleted: onLessonCompleted,
         );

@@ -680,6 +680,90 @@ class ApiClient {
   }
 
   // ============================================================
+  // AI MENTORSHIP & TUTOR
+  // ============================================================
+
+  static Future<Map<String, dynamic>> getAIStatus({
+    required String accessToken,
+  }) async {
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/ai/status'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> getAIHint({
+    required String accessToken,
+    required String lessonId,
+    required int hintLevel,
+    Map<String, dynamic>? visualizationState,
+    String? code,
+    String? errorInfo,
+  }) async {
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/ai/hint'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: jsonEncode({
+            'lesson_id': lessonId,
+            'hint_level': hintLevel,
+            'visualization_state': ?visualizationState,
+            'code': ?code,
+            'error_info': ?errorInfo,
+          }),
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> explainAIError({
+    required String accessToken,
+    required String submissionId,
+  }) async {
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/ai/explain'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: jsonEncode({'submission_id': submissionId}),
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> getAIRecommendations({
+    required String accessToken,
+  }) async {
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/ai/recommend'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  // ============================================================
   // LOGOUT
   // ============================================================
 

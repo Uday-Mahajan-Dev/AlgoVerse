@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from app.api.v1.ai.router import router as ai_router
 from app.api.v1.auth.router import router as auth_router
 from app.api.v1.courses.router import lesson_router
 from app.api.v1.courses.router import router as courses_router
@@ -16,4 +17,5 @@ api_router.include_router(dashboard_router, prefix="/dashboard")
 api_router.include_router(teachers_router, prefix="/teachers")
 api_router.include_router(courses_router, prefix="/courses")
 api_router.include_router(problems_router, prefix="/problems")
+api_router.include_router(ai_router, prefix="/ai")
 api_router.include_router(lesson_router)

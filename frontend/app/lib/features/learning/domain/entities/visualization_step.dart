@@ -45,6 +45,20 @@ class VisualizationStep {
     );
   }
 
+  Map<String, dynamic> toJson({String? algorithmName}) {
+    return {
+      'algorithm': ?algorithmName,
+      'step_number': stepNumber,
+      'source_line': sourceLine,
+      'array_state': arrayState,
+      'pointers': pointers,
+      'variables': variables,
+      'operation': operation,
+      'explanation': explanation,
+      'result': ?result,
+    };
+  }
+
   @override
   String toString() {
     return 'Step $stepNumber (Line $sourceLine) [$operation]: $explanation | Array: $arrayState | Pointers: $pointers | Vars: $variables';
