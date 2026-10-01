@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     # ==========================================
 
     DATABASE_URL: str
+    ALEMBIC_DATABASE_URL: str | None = None
+
+    @property
+    def alembic_url(self) -> str:
+        return self.ALEMBIC_DATABASE_URL or self.DATABASE_URL
 
     # ==========================================
     # JWT Authentication
