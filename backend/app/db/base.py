@@ -7,3 +7,8 @@ from app.models.auth_provider import AuthProvider
 from app.models.email_otp import EmailOTP
 from app.models.teacher_invitation import TeacherInvitation
 from app.models.student_teacher import StudentTeacher
+from app.models.course import Course
+from app.models.course_module import CourseModule
+from app.models.lesson import Lesson
+from app.models.course_enrollment import CourseEnrollment
+from app.models.lesson_completion import LessonCompletion

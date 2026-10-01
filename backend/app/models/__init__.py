@@ -5,3 +5,8 @@ from .auth_provider import AuthProvider
 from .email_otp import EmailOTP
 from .teacher_invitation import TeacherInvitation
 from .student_teacher import StudentTeacher
+from .course import Course
+from .course_module import CourseModule
+from .lesson import Lesson
+from .course_enrollment import CourseEnrollment
+from .lesson_completion import LessonCompletion

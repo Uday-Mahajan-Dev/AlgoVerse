@@ -1,14 +1,15 @@
 import 'package:go_router/go_router.dart';
-import '../features/student_dashboard/presentation/pages/student_dashboard_page.dart';
 
 import '../core/constants/app_routes.dart';
-
-import '../features/splash/presentation/pages/splash_page.dart';
 import '../features/auth/presentation/pages/login_page.dart';
 import '../features/auth/presentation/pages/register_page.dart';
 import '../features/auth/presentation/pages/verify_email_page.dart';
+import '../features/courses/presentation/pages/course_catalog_page.dart';
+import '../features/courses/presentation/pages/course_detail_page.dart';
+import '../features/courses/presentation/pages/lesson_view_page.dart';
 import '../features/home/presentation/pages/home_page.dart';
-
+import '../features/splash/presentation/pages/splash_page.dart';
+import '../features/student_dashboard/presentation/pages/student_dashboard_page.dart';
 import '../features/teachers/presentation/pages/teacher_catalog_page.dart';
 import '../features/teachers/presentation/pages/teacher_profile_page.dart';
 
@@ -60,6 +61,28 @@ final appRouter = GoRouter(
       builder: (context, state) {
         final teacherId = state.pathParameters['id'] ?? '';
         return TeacherProfilePage(teacherId: teacherId);
+      },
+    ),
+
+    GoRoute(
+      path: AppRoutes.courses,
+      builder: (context, state) => const CourseCatalogPage(),
+    ),
+
+    GoRoute(
+      path: '/courses/:slug',
+      builder: (context, state) {
+        final slug = state.pathParameters['slug'] ?? '';
+        return CourseDetailPage(courseSlug: slug);
+      },
+    ),
+
+    GoRoute(
+      path: '/courses/:slug/lessons/:lessonSlug',
+      builder: (context, state) {
+        final slug = state.pathParameters['slug'] ?? '';
+        final lessonSlug = state.pathParameters['lessonSlug'] ?? '';
+        return LessonViewPage(courseSlug: slug, lessonSlug: lessonSlug);
       },
     ),
   ],

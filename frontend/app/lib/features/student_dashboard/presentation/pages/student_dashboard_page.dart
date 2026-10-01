@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/storage/token_storage.dart';
+import '../../../courses/domain/entities/course_entity.dart';
+import '../../../courses/presentation/providers/course_provider.dart';
 import '../../../teachers/domain/entities/teacher_entity.dart';
 import '../../../teachers/presentation/providers/teacher_provider.dart';
 import '../../domain/entities/student_dashboard_entity.dart';
@@ -74,6 +76,7 @@ class _StudentDashboardPageState extends ConsumerState<StudentDashboardPage> {
   Widget build(BuildContext context) {
     final dashboardAsync = ref.watch(studentDashboardProvider);
     final myTeacherAsync = ref.watch(myTeacherProvider);
+    final progressAsync = ref.watch(allStudentProgressProvider);
 
     return Scaffold(
       body: SafeArea(
@@ -100,6 +103,7 @@ class _StudentDashboardPageState extends ConsumerState<StudentDashboardPage> {
             onRefresh: () async {
               ref.invalidate(studentDashboardProvider);
               ref.invalidate(myTeacherProvider);
+              ref.invalidate(allStudentProgressProvider);
             },
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
@@ -120,13 +124,19 @@ class _StudentDashboardPageState extends ConsumerState<StudentDashboardPage> {
                   MentorSection(myTeacherAsync: myTeacherAsync),
                   const SizedBox(height: 28),
 
-                  const SectionTitle(title: 'CONTINUE YOUR JOURNEY'),
+                  SectionTitle(
+                    title: 'CONTINUE YOUR JOURNEY',
+                    action: 'EXPLORE COURSES',
+                    onActionTap: () => context.push(AppRoutes.courses),
+                  ),
                   const SizedBox(height: 12),
 
                   ContinueLearningCard(
-                    continueLearning: data.continueLearning,
+                    fallbackContinueLearning: data.continueLearning,
+                    progressAsync: progressAsync,
                   ),
                   const SizedBox(height: 28),
+
 
                   const SectionTitle(
                     title: 'DAILY MISSIONS',
@@ -247,8 +257,14 @@ class DashboardHeader extends StatelessWidget {
 class SectionTitle extends StatelessWidget {
   final String title;
   final String? action;
+  final VoidCallback? onActionTap;
 
-  const SectionTitle({super.key, required this.title, this.action});
+  const SectionTitle({
+    super.key,
+    required this.title,
+    this.action,
+    this.onActionTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -264,11 +280,16 @@ class SectionTitle extends StatelessWidget {
             ),
           ),
         ),
-        if (action != null) TextButton(onPressed: () {}, child: Text(action!)),
+        if (action != null)
+          TextButton(
+            onPressed: onActionTap ?? () {},
+            child: Text(action!),
+          ),
       ],
     );
   }
 }
+
 
 //
 // LEVEL + XP CARD
@@ -361,15 +382,147 @@ class LevelXpCard extends StatelessWidget {
 //
 
 class ContinueLearningCard extends StatelessWidget {
-  final StudentContinueLearning continueLearning;
+  final StudentContinueLearning fallbackContinueLearning;
+  final AsyncValue<List<CourseProgressEntity>> progressAsync;
 
   const ContinueLearningCard({
     super.key,
-    required this.continueLearning,
+    required this.fallbackContinueLearning,
+    required this.progressAsync,
   });
 
   @override
   Widget build(BuildContext context) {
+    return progressAsync.when(
+      loading: () => Card(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: Colors.grey.shade300),
+        ),
+        child: const Padding(
+          padding: EdgeInsets.all(28),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ),
+      error: (err, stack) => _buildFallback(context),
+      data: (progressList) {
+
+        if (progressList.isEmpty) {
+          return Card(
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: BorderSide(color: Colors.grey.shade300),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.indigo.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child:
+                        const Icon(Icons.school_outlined, color: Colors.indigo),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    'Start Your DSA Journey',
+                    style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Enroll in our structured pathways (Arrays, Binary Trees, Dynamic Programming) to begin interactive learning.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey.shade600,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: () => context.push(AppRoutes.courses),
+                      icon: const Icon(Icons.explore_outlined),
+                      label: const Text('EXPLORE COURSE PATHWAYS'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        final active = progressList.first;
+        final progressFraction =
+            (active.completionPercentage / 100.0).clamp(0.0, 1.0);
+
+        return Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(color: Colors.grey.shade300),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.menu_book_outlined, size: 28),
+                const SizedBox(height: 16),
+                const Text(
+                  'COURSE PATHWAY',
+                  style: TextStyle(
+                    fontSize: 12,
+                    letterSpacing: 1.1,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.indigo,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  active.courseTitle,
+                  style: const TextStyle(
+                      fontSize: 22, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  '${active.completedLessons} of ${active.totalLessons} Lessons Completed (${active.completionPercentage.toStringAsFixed(0)}%)',
+                  style: const TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: LinearProgressIndicator(
+                    value: progressFraction,
+                    minHeight: 8,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      context.push('/courses/${active.courseSlug}');
+                    },
+                    child: const Text('CONTINUE LEARNING'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildFallback(BuildContext context) {
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -384,7 +537,7 @@ class ContinueLearningCard extends StatelessWidget {
             const Icon(Icons.menu_book_outlined, size: 28),
             const SizedBox(height: 16),
             Text(
-              continueLearning.category,
+              fallbackContinueLearning.category,
               style: const TextStyle(
                 fontSize: 12,
                 letterSpacing: 1.1,
@@ -393,19 +546,19 @@ class ContinueLearningCard extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             Text(
-              continueLearning.topic,
+              fallbackContinueLearning.topic,
               style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             Text(
-              continueLearning.progressText,
+              fallbackContinueLearning.progressText,
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             ClipRRect(
               borderRadius: BorderRadius.circular(20),
               child: LinearProgressIndicator(
-                value: continueLearning.progress.clamp(0.0, 1.0),
+                value: fallbackContinueLearning.progress.clamp(0.0, 1.0),
                 minHeight: 8,
               ),
             ),
@@ -413,8 +566,10 @@ class ContinueLearningCard extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () {},
-                child: const Text('CONTINUE LEARNING'),
+                onPressed: () {
+                  context.push(AppRoutes.courses);
+                },
+                child: const Text('EXPLORE COURSES'),
               ),
             ),
           ],
@@ -423,6 +578,7 @@ class ContinueLearningCard extends StatelessWidget {
     );
   }
 }
+
 
 //
 // DAILY MISSIONS

@@ -304,6 +304,116 @@ class ApiClient {
   }
 
   // ============================================================
+  // COURSES & LESSONS
+  // ============================================================
+
+  static Future<List<dynamic>> getCourses({String? accessToken}) async {
+    final headers = <String, String>{
+      'Accept': 'application/json',
+    };
+    if (accessToken != null && accessToken.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $accessToken';
+    }
+
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/courses'),
+          headers: headers,
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleListResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> getCourseDetail({
+    required String slug,
+    String? accessToken,
+  }) async {
+    final headers = <String, String>{
+      'Accept': 'application/json',
+    };
+    if (accessToken != null && accessToken.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $accessToken';
+    }
+
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/courses/$slug'),
+          headers: headers,
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> enrollInCourse({
+    required String accessToken,
+    required String slug,
+  }) async {
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/courses/$slug/enroll'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> getCourseProgress({
+    required String accessToken,
+    required String slug,
+  }) async {
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/courses/$slug/progress'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<List<dynamic>> getMyAllProgress({
+    required String accessToken,
+  }) async {
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/courses/my-progress'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleListResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> completeLesson({
+    required String accessToken,
+    required String lessonId,
+  }) async {
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/lessons/$lessonId/complete'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  // ============================================================
   // LOGOUT
   // ============================================================
 
@@ -319,3 +429,4 @@ class ApiClient {
     await _handleResponse(response);
   }
 }
+
