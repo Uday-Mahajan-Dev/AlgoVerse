@@ -446,7 +446,7 @@ class MissionCard extends StatelessWidget {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: Colors.indigo.withOpacity(0.1),
+                color: Colors.indigo.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Icon(
@@ -612,7 +612,7 @@ class NextAchievementCard extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          color: Colors.indigo.withOpacity(0.4),
+          color: Colors.indigo.withValues(alpha: 0.4),
         ),
       ),
       child: Column(

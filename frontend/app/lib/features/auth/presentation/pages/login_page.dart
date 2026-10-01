@@ -76,7 +76,10 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _googleLogin() async {
     if (_isLoading) return;
 
-    await _socialLogin(SocialAuthService.signInWithGoogle);
+    await _socialLogin(
+      SocialAuthService.signInWithGoogle,
+      destination: AppRoutes.studentDashboard,
+    );
   }
 
   // ============================================================
@@ -86,12 +89,16 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _githubLogin() async {
     if (_isLoading) return;
 
-    await _socialLogin(SocialAuthService.signInWithGitHub);
+    await _socialLogin(
+      SocialAuthService.signInWithGitHub,
+      destination: AppRoutes.home,
+    );
   }
 
   Future<void> _socialLogin(
-    Future<Map<String, dynamic>> Function() loginMethod,
-  ) async {
+    Future<Map<String, dynamic>> Function() loginMethod, {
+    required String destination,
+  }) async {
     setState(() {
       _isLoading = true;
     });
@@ -103,7 +110,7 @@ class _LoginPageState extends State<LoginPage> {
 
       if (!mounted) return;
 
-      context.go(AppRoutes.home);
+      context.go(destination);
     } catch (e) {
       if (!mounted) return;
 

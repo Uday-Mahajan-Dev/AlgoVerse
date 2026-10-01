@@ -15,12 +15,13 @@ class AppRoutes {
   // ============================================================
 
   static const home = '/home';
-
+  static const studentDashboard = '/student-dashboard';
   static const stories = '/stories';
   static const problems = '/problems';
   static const contests = '/contests';
   static const leaderboard = '/leaderboard';
   static const profile = '/profile';
   static const teacher = '/teacher';
+  static const teachers = '/teachers';
   static const settings = '/settings';
 }

@@ -1,4 +1,5 @@
-﻿import 'package:go_router/go_router.dart';
+import 'package:go_router/go_router.dart';
+import '../features/student_dashboard/presentation/pages/student_dashboard_page.dart';
 
 import '../core/constants/app_routes.dart';
 
@@ -7,6 +8,9 @@ import '../features/auth/presentation/pages/login_page.dart';
 import '../features/auth/presentation/pages/register_page.dart';
 import '../features/auth/presentation/pages/verify_email_page.dart';
 import '../features/home/presentation/pages/home_page.dart';
+
+import '../features/teachers/presentation/pages/teacher_catalog_page.dart';
+import '../features/teachers/presentation/pages/teacher_profile_page.dart';
 
 final appRouter = GoRouter(
   initialLocation: AppRoutes.splash,
@@ -39,6 +43,24 @@ final appRouter = GoRouter(
     GoRoute(
       path: AppRoutes.home,
       builder: (context, state) => const HomePage(),
+    ),
+
+    GoRoute(
+      path: AppRoutes.studentDashboard,
+      builder: (context, state) => const StudentDashboardPage(),
+    ),
+
+    GoRoute(
+      path: AppRoutes.teachers,
+      builder: (context, state) => const TeacherCatalogPage(),
+    ),
+
+    GoRoute(
+      path: '/teachers/:id',
+      builder: (context, state) {
+        final teacherId = state.pathParameters['id'] ?? '';
+        return TeacherProfilePage(teacherId: teacherId);
+      },
     ),
   ],
 );

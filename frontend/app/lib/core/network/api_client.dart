@@ -31,6 +31,29 @@ class ApiClient {
     return body;
   }
 
+  static Future<List<dynamic>> _handleListResponse(
+    http.Response response,
+  ) async {
+    List<dynamic> list = [];
+
+    if (response.body.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(response.body);
+        if (decoded is List) {
+          list = decoded;
+        }
+      } catch (_) {
+        list = [];
+      }
+    }
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Something went wrong. Please try again.');
+    }
+
+    return list;
+  }
+
   // ============================================================
   // REGISTER
   // ============================================================
@@ -161,6 +184,119 @@ class ApiClient {
           Uri.parse('$baseUrl/auth/refresh'),
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({'refresh_token': refreshToken}),
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  // ============================================================
+  // DASHBOARDS
+  // ============================================================
+
+  static Future<Map<String, dynamic>> getStudentDashboard(
+    String accessToken,
+  ) async {
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/dashboard/student'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> getTeacherDashboard(
+    String accessToken,
+  ) async {
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/dashboard/teacher'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  // ============================================================
+  // TEACHERS
+  // ============================================================
+
+  static Future<List<dynamic>> getTeachers({
+    required String accessToken,
+    String? query,
+  }) async {
+    final uri = Uri.parse(
+      query != null && query.trim().isNotEmpty
+          ? '$baseUrl/teachers?q=${Uri.encodeComponent(query.trim())}'
+          : '$baseUrl/teachers',
+    );
+
+    final response = await http
+        .get(
+          uri,
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleListResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> getMyTeacher(
+    String accessToken,
+  ) async {
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/teachers/my-teacher'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> getTeacherProfile({
+    required String accessToken,
+    required String teacherId,
+  }) async {
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/teachers/$teacherId'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> selectTeacher({
+    required String accessToken,
+    required String teacherId,
+  }) async {
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/teachers/$teacherId/select'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Accept': 'application/json',
+          },
         )
         .timeout(AppConstants.requestTimeout);
 
