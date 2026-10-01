@@ -16,3 +16,4 @@ from app.models.student_lesson_activity import StudentLessonActivity
 from app.models.problem import Problem
 from app.models.test_case import TestCase
 from app.models.submission import Submission
+from app.models.assignment import Assignment

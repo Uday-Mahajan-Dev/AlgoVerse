@@ -14,3 +14,4 @@ from .student_lesson_activity import StudentLessonActivity
 from .problem import Problem
 from .test_case import TestCase
 from .submission import Submission
+from .assignment import Assignment

@@ -487,6 +487,24 @@ class CourseService:
             completed_at=datetime.now(timezone.utc),
         )
         db.add(completion)
+
+        # Also auto-complete any matching pending/overdue assignments for this student and lesson
+        from app.models.assignment import Assignment
+        matching_assignments = (
+            db.execute(
+                select(Assignment).where(
+                    Assignment.student_id == student_id,
+                    Assignment.lesson_id == lesson.id,
+                    Assignment.status.in_(["pending", "overdue"]),
+                )
+            )
+            .scalars()
+            .all()
+        )
+        for assign in matching_assignments:
+            assign.status = "completed"
+            assign.completed_at = completion.completed_at
+
         db.commit()
         db.refresh(completion)
 

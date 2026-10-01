@@ -553,6 +553,133 @@ class ApiClient {
   }
 
   // ============================================================
+  // TEACHER ANALYTICS & ASSIGNMENTS
+  // ============================================================
+
+  static Future<Map<String, dynamic>> getTeacherAnalyticsOverview({
+    required String accessToken,
+  }) async {
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/teachers/analytics/overview'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<List<dynamic>> getTeacherAnalyticsStudents({
+    required String accessToken,
+  }) async {
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/teachers/analytics/students'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleListResponse(response);
+  }
+
+  static Future<List<dynamic>> getTeacherAnalyticsBottlenecks({
+    required String accessToken,
+  }) async {
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/teachers/analytics/bottlenecks'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleListResponse(response);
+  }
+
+  static Future<List<dynamic>> getTeacherAnalyticsConcepts({
+    required String accessToken,
+  }) async {
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/teachers/analytics/concepts'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleListResponse(response);
+  }
+
+  static Future<List<dynamic>> createTeacherAssignment({
+    required String accessToken,
+    required List<String> studentIds,
+    required String lessonId,
+    DateTime? dueDate,
+    String? notes,
+  }) async {
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/teachers/assignments'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: jsonEncode({
+            'student_ids': studentIds,
+            'lesson_id': lessonId,
+            'due_date': ?dueDate?.toUtc().toIso8601String(),
+            'notes': ?notes,
+          }),
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleListResponse(response);
+  }
+
+  static Future<List<dynamic>> getTeacherAssignments({
+    required String accessToken,
+  }) async {
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/teachers/assignments'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleListResponse(response);
+  }
+
+  static Future<List<dynamic>> getStudentAssignments({
+    required String accessToken,
+  }) async {
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/dashboard/assignments'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleListResponse(response);
+  }
+
+  // ============================================================
   // LOGOUT
   // ============================================================
 

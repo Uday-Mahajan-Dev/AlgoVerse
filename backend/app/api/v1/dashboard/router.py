@@ -14,6 +14,7 @@ from app.schemas.dashboard import (
     StudentMetricsResponse,
     TeacherDashboardResponse,
 )
+from app.schemas.teacher_analytics import AssignmentResponse
 from app.services.dashboard_service import DashboardService
 
 router = APIRouter(
@@ -83,4 +84,20 @@ def get_teacher_dashboard(
     return DashboardService.get_teacher_dashboard(
         db=db,
         teacher=current_teacher,
+    )
+
+
+@router.get(
+    "/assignments",
+    response_model=list[AssignmentResponse],
+    summary="Get homework assignments for the authenticated student",
+)
+def get_student_assignments(
+    current_student: User = Depends(get_current_student),
+    db: Session = Depends(get_db),
+):
+    from app.services.teacher_analytics_service import TeacherAnalyticsService
+    return TeacherAnalyticsService.get_student_assignments(
+        db=db,
+        student_id=current_student.id,
     )

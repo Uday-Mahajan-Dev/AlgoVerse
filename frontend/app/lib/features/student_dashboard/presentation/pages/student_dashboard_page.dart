@@ -6,6 +6,8 @@ import '../../../../core/constants/app_routes.dart';
 import '../../../../core/storage/token_storage.dart';
 import '../../../courses/domain/entities/course_entity.dart';
 import '../../../courses/presentation/providers/course_provider.dart';
+import '../../../teacher_dashboard/domain/entities/teacher_analytics_entity.dart';
+import '../../../teacher_dashboard/presentation/providers/teacher_analytics_provider.dart';
 import '../../../teachers/domain/entities/teacher_entity.dart';
 import '../../../teachers/presentation/providers/teacher_provider.dart';
 import '../../domain/entities/student_dashboard_entity.dart';
@@ -79,6 +81,7 @@ class _StudentDashboardPageState extends ConsumerState<StudentDashboardPage> {
     final metricsAsync = ref.watch(studentMetricsProvider);
     final myTeacherAsync = ref.watch(myTeacherProvider);
     final progressAsync = ref.watch(allStudentProgressProvider);
+    final studentAssignmentsAsync = ref.watch(studentAssignmentsProvider);
 
     return Scaffold(
       body: SafeArea(
@@ -101,6 +104,7 @@ class _StudentDashboardPageState extends ConsumerState<StudentDashboardPage> {
                     ref.invalidate(studentMetricsProvider);
                     ref.invalidate(myTeacherProvider);
                     ref.invalidate(allStudentProgressProvider);
+                    ref.invalidate(studentAssignmentsProvider);
                   },
                   child: const Text('Retry'),
                 ),
@@ -114,6 +118,7 @@ class _StudentDashboardPageState extends ConsumerState<StudentDashboardPage> {
               ref.invalidate(studentMetricsProvider);
               ref.invalidate(myTeacherProvider);
               ref.invalidate(allStudentProgressProvider);
+              ref.invalidate(studentAssignmentsProvider);
             },
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
@@ -145,6 +150,11 @@ class _StudentDashboardPageState extends ConsumerState<StudentDashboardPage> {
                     continueLearningAsync: continueLearningAsync,
                     fallbackContinueLearning: data.continueLearning,
                   ),
+                  const SizedBox(height: 28),
+
+                  const SectionTitle(title: 'YOUR HOMEWORK & ASSIGNMENTS'),
+                  const SizedBox(height: 12),
+                  StudentHomeworkSection(assignmentsAsync: studentAssignmentsAsync),
                   const SizedBox(height: 28),
 
                   const SectionTitle(title: 'YOUR PERFORMANCE'),
@@ -1448,6 +1458,249 @@ class MentorSection extends StatelessWidget {
               ),
             ],
           ),
+        );
+      },
+    );
+  }
+}
+
+class StudentHomeworkSection extends StatelessWidget {
+  final AsyncValue<List<AssignmentEntity>> assignmentsAsync;
+
+  const StudentHomeworkSection({
+    super.key,
+    required this.assignmentsAsync,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return assignmentsAsync.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.all(16),
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (e, _) => Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
+        child: Text(
+          'Unable to load assignments: $e',
+          style: const TextStyle(fontSize: 12, color: Colors.grey),
+        ),
+      ),
+      data: (assignments) {
+        if (assignments.isEmpty) {
+          return Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.assignment_turned_in_rounded,
+                    color: Color(0xFF10B981),
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'All Caught Up!',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E293B),
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'No pending homework from your mentor teacher.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: assignments.length,
+          separatorBuilder: (context, index) => const SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            final a = assignments[index];
+            final isOverdue = a.isOverdue;
+            final isCompleted = a.isCompleted;
+
+            Color statusColor;
+            String statusText;
+            if (isCompleted) {
+              statusColor = const Color(0xFF10B981);
+              statusText = 'COMPLETED';
+            } else if (isOverdue) {
+              statusColor = const Color(0xFFEF4444);
+              statusText = 'OVERDUE';
+            } else {
+              statusColor = const Color(0xFF3B82F6);
+              statusText = 'PENDING';
+            }
+
+            return Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isOverdue ? Colors.red.shade200 : const Color(0xFFE2E8F0),
+                  width: isOverdue ? 1.5 : 1.0,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.02),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: statusColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          statusText,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: statusColor,
+                            letterSpacing: 0.6,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Assigned by ${a.teacherName}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                      const Spacer(),
+                      if (a.dueDate != null)
+                        Text(
+                          'Due: ${a.dueDate!.month}/${a.dueDate!.day}/${a.dueDate!.year}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: isOverdue ? Colors.red : Colors.grey.shade600,
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    a.lessonTitle,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    a.courseTitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade500,
+                    ),
+                  ),
+                  if (a.notes != null && a.notes!.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'Note: ${a.notes!}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade700,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: () {
+                        context.push(
+                          '/courses/${a.courseSlug}/lessons/${a.lessonSlug}',
+                        );
+                      },
+                      style: FilledButton.styleFrom(
+                        backgroundColor: isCompleted
+                            ? Colors.grey.shade700
+                            : (isOverdue ? Colors.red.shade700 : Colors.indigo),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      icon: Icon(
+                        isCompleted
+                            ? Icons.replay_rounded
+                            : Icons.play_arrow_rounded,
+                        size: 18,
+                      ),
+                      label: Text(
+                        isCompleted ? 'Review Lesson' : 'Start Assignment',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
         );
       },
     );
