@@ -80,3 +80,5 @@ Thumbs.db
 !.vscode/extensions.json
 # Firebase Admin SDK private credentials
 backend/firebase-service-account.json
+
+backend/.env.example
