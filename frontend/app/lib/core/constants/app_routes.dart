@@ -23,6 +23,7 @@ class AppRoutes {
   static const profile = '/profile';
   static const teacher = '/teacher';
   static const teachers = '/teachers';
+  static const becomeEducator = '/become-educator';
   static const courses = '/courses';
   static const settings = '/settings';
 }

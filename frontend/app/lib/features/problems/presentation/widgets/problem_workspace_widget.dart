@@ -127,42 +127,73 @@ class _ProblemWorkspaceWidgetState
         ),
       ),
       data: (problem) {
-        final mainProblemWorkspace = Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Top Navigation & Language Selector Bar
-            _buildTopBar(context, problem, state, notifier),
-            const SizedBox(height: 16),
-
-            if (_activeViewTab == 0) ...[
-              // Problem Statement & Instructions Card
-              _buildProblemStatementCard(context, problem),
-              const SizedBox(height: 20),
-
-              // Code Editor
-              _buildCodeEditor(context, problem, state, notifier),
-              const SizedBox(height: 12),
-
-              // Run / Submit Action Controls
-              _buildActionControls(context, state, notifier),
-              const SizedBox(height: 16),
-
-              // Output Console & Test Results
-              _buildOutputConsole(context, state, notifier),
-            ] else ...[
-              // Past Submissions History
-              _buildSubmissionsHistory(context, state, notifier, problem.id),
-            ],
-          ],
-        );
-
         final targetLessonId = widget.lessonId ?? problem.lessonId;
         final hasFailedSub = state.submissionResult != null &&
             state.submissionResult!.verdict != 'AC';
 
         return LayoutBuilder(
           builder: (context, constraints) {
-            final isWide = constraints.maxWidth > 920;
+            final isDesktop = constraints.maxWidth >= 800;
+            final isWideForAI = constraints.maxWidth > 920;
+
+            final Widget workspaceBody;
+            if (_activeViewTab == 1) {
+              workspaceBody = _buildSubmissionsHistory(
+                context,
+                state,
+                notifier,
+                problem.id,
+              );
+            } else if (isDesktop) {
+              workspaceBody = Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Left Pane: Problem Statement & Test Cases
+                  Expanded(
+                    flex: 5,
+                    child: _buildProblemStatementCard(context, problem),
+                  ),
+                  const SizedBox(width: 16),
+                  // Right Pane: Code Editor + Actions + Output Console
+                  Expanded(
+                    flex: 6,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildCodeEditor(context, problem, state, notifier),
+                        const SizedBox(height: 12),
+                        _buildActionControls(context, state, notifier),
+                        const SizedBox(height: 16),
+                        _buildOutputConsole(context, state, notifier),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            } else {
+              // Mobile / Tablet Stacked Column
+              workspaceBody = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildProblemStatementCard(context, problem),
+                  const SizedBox(height: 16),
+                  _buildCodeEditor(context, problem, state, notifier),
+                  const SizedBox(height: 12),
+                  _buildActionControls(context, state, notifier),
+                  const SizedBox(height: 16),
+                  _buildOutputConsole(context, state, notifier),
+                ],
+              );
+            }
+
+            final mainProblemWorkspace = Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildTopBar(context, problem, state, notifier),
+                const SizedBox(height: 16),
+                workspaceBody,
+              ],
+            );
 
             return Stack(
               children: [
@@ -170,7 +201,7 @@ class _ProblemWorkspaceWidgetState
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(child: mainProblemWorkspace),
-                    if (_showAITutor && isWide) ...[
+                    if (_showAITutor && isWideForAI) ...[
                       const SizedBox(width: 16),
                       AITutorPanel(
                         lessonId: targetLessonId,
@@ -188,26 +219,6 @@ class _ProblemWorkspaceWidgetState
                   ],
                 ),
 
-                // Slide-over for smaller screens
-                if (_showAITutor && !isWide)
-                  Positioned(
-                    top: 0,
-                    bottom: 0,
-                    right: 0,
-                    child: AITutorPanel(
-                      lessonId: targetLessonId,
-                      submissionId: state.submissionResult?.submissionId,
-                      getCode: () => _codeController.text,
-                      getErrorInfo: () {
-                        if (state.submissionResult != null) {
-                          return 'Verdict: ${state.submissionResult!.verdict}, Passed ${state.submissionResult!.passedCount}/${state.submissionResult!.totalCount} tests. Details: ${state.submissionResult!.message}';
-                        }
-                        return null;
-                      },
-                      onClose: () => setState(() => _showAITutor = false),
-                    ),
-                  ),
-
                 // Floating AI Tutor Action Button
                 Positioned(
                   bottom: 16,
@@ -215,9 +226,24 @@ class _ProblemWorkspaceWidgetState
                   child: FloatingActionButton.extended(
                     heroTag: 'ai_tutor_problem_fab',
                     onPressed: () {
-                      setState(() {
-                        _showAITutor = !_showAITutor;
-                      });
+                      if (!isWideForAI) {
+                        AITutorPanel.showAsModalBottomSheet(
+                          context,
+                          lessonId: targetLessonId,
+                          submissionId: state.submissionResult?.submissionId,
+                          getCode: () => _codeController.text,
+                          getErrorInfo: () {
+                            if (state.submissionResult != null) {
+                              return 'Verdict: ${state.submissionResult!.verdict}, Passed ${state.submissionResult!.passedCount}/${state.submissionResult!.totalCount} tests. Details: ${state.submissionResult!.message}';
+                            }
+                            return null;
+                          },
+                        );
+                      } else {
+                        setState(() {
+                          _showAITutor = !_showAITutor;
+                        });
+                      }
                     },
                     backgroundColor: hasFailedSub
                         ? Colors.orange.shade700
@@ -229,7 +255,7 @@ class _ProblemWorkspaceWidgetState
                       style: const TextStyle(fontSize: 18),
                     ),
                     label: Text(
-                      _showAITutor
+                      isWideForAI && _showAITutor
                           ? 'Hide AI Tutor'
                           : (hasFailedSub
                               ? 'Explain Error (AI)'
@@ -731,8 +757,11 @@ class _ProblemWorkspaceWidgetState
     ProblemState state,
     ProblemNotifier notifier,
   ) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
+    return Wrap(
+      spacing: 12,
+      runSpacing: 10,
+      alignment: WrapAlignment.end,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         // Run Trial Button (Public Cases Only)
         OutlinedButton.icon(
@@ -762,7 +791,6 @@ class _ProblemWorkspaceWidgetState
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
         ),
-        const SizedBox(width: 12),
 
         // Submit Solution Button (All Cases + DB Save + Auto Lesson Complete)
         FilledButton.icon(
@@ -884,7 +912,11 @@ class _ProblemWorkspaceWidgetState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Verdict Header
-          Row(
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -913,7 +945,6 @@ class _ProblemWorkspaceWidgetState
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
               Text(
                 'Passed: ${trial.passedCount}/${trial.totalCount} Test Cases',
                 style: const TextStyle(
@@ -922,7 +953,6 @@ class _ProblemWorkspaceWidgetState
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const Spacer(),
               Text(
                 '⏱ ${trial.executionTimeMs}ms • 💾 ${(trial.memoryUsedKb / 1024).toStringAsFixed(1)}MB',
                 style: const TextStyle(
@@ -1115,108 +1145,201 @@ class _ProblemWorkspaceWidgetState
     final isAccepted = sub.isAccepted;
     final color = _getVerdictColor(sub.verdict);
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: isAccepted ? const Color(0xFF064E3B) : const Color(0xFF1E1E2E),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isAccepted ? const Color(0xFF10B981) : color,
-          width: 1.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: (isAccepted ? Colors.green : Colors.black).withValues(alpha: 0.2),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                isAccepted ? Icons.celebration_rounded : Icons.highlight_off_rounded,
-                color: isAccepted ? Colors.white : color,
-                size: 28,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 600;
+
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color:
+                isAccepted ? const Color(0xFF064E3B) : const Color(0xFF1E1E2E),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isAccepted ? const Color(0xFF10B981) : color,
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: (isAccepted ? Colors.green : Colors.black)
+                    .withValues(alpha: 0.2),
+                blurRadius: 14,
+                offset: const Offset(0, 4),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (isMobile) ...[
+                Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    Icon(
                       isAccepted
-                          ? 'ACCEPTED — PROBLEM SOLVED!'
-                          : 'VERDICT: ${_getVerdictTitle(sub.verdict).toUpperCase()}',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: isAccepted ? Colors.white : color,
-                        letterSpacing: 0.5,
-                      ),
+                          ? Icons.celebration_rounded
+                          : Icons.highlight_off_rounded,
+                      color: isAccepted ? Colors.white : color,
+                      size: 26,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      sub.message,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: isAccepted ? const Color(0xFFA7F3D0) : const Color(0xFFCDD6F4),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            isAccepted
+                                ? 'ACCEPTED — SOLVED!'
+                                : 'VERDICT: ${_getVerdictTitle(sub.verdict).toUpperCase()}',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: isAccepted ? Colors.white : color,
+                              letterSpacing: 0.5,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            sub.message,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: isAccepted
+                                  ? const Color(0xFFA7F3D0)
+                                  : const Color(0xFFCDD6F4),
+                            ),
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  '${sub.passedCount} / ${sub.totalCount} Passed',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    fontSize: 13,
+                const SizedBox(height: 10),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                ),
-              ),
-            ],
-          ),
-
-          if (isAccepted && sub.isLessonCompleted) ...[
-            const SizedBox(height: 16),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.workspace_premium_rounded, color: Colors.amberAccent, size: 22),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Lesson marked complete & +50 XP awarded to your profile!',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                      ),
+                  child: Text(
+                    '${sub.passedCount} / ${sub.totalCount} Passed',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      fontSize: 12,
                     ),
                   ),
-                ],
-              ),
-            ),
-          ],
-        ],
-      ),
+                ),
+              ] else ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Icon(
+                            isAccepted
+                                ? Icons.celebration_rounded
+                                : Icons.highlight_off_rounded,
+                            color: isAccepted ? Colors.white : color,
+                            size: 28,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  isAccepted
+                                      ? 'ACCEPTED — PROBLEM SOLVED!'
+                                      : 'VERDICT: ${_getVerdictTitle(sub.verdict).toUpperCase()}',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: isAccepted ? Colors.white : color,
+                                    letterSpacing: 0.5,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  sub.message,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: isAccepted
+                                        ? const Color(0xFFA7F3D0)
+                                        : const Color(0xFFCDD6F4),
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '${sub.passedCount} / ${sub.totalCount} Passed',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              if (isAccepted && sub.isLessonCompleted) ...[
+                const SizedBox(height: 14),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(
+                        Icons.workspace_premium_rounded,
+                        color: Colors.amberAccent,
+                        size: 22,
+                      ),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Lesson marked complete & +50 XP awarded to your profile!',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 

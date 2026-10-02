@@ -1,4 +1,5 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_routes.dart';
@@ -76,6 +77,11 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _googleLogin() async {
     if (_isLoading) return;
 
+    if (kIsWeb) {
+      _showMessage('Please use Email & Password to log in on Web.');
+      return;
+    }
+
     await _socialLogin(
       SocialAuthService.signInWithGoogle,
       destination: AppRoutes.studentDashboard,
@@ -89,6 +95,11 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _githubLogin() async {
     if (_isLoading) return;
 
+    if (kIsWeb) {
+      _showMessage('Please use Email & Password to log in on Web.');
+      return;
+    }
+
     await _socialLogin(
       SocialAuthService.signInWithGitHub,
       destination: AppRoutes.home,
@@ -99,6 +110,11 @@ class _LoginPageState extends State<LoginPage> {
     Future<Map<String, dynamic>> Function() loginMethod, {
     required String destination,
   }) async {
+    if (kIsWeb) {
+      _showMessage('Please use Email & Password to log in on Web.');
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
@@ -111,6 +127,12 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
 
       context.go(destination);
+    } on UnimplementedError {
+      if (!mounted) return;
+      _showMessage('Please use Email & Password to log in on Web.');
+    } on UnsupportedError {
+      if (!mounted) return;
+      _showMessage('Please use Email & Password to log in on Web.');
     } catch (e) {
       if (!mounted) return;
 

@@ -290,75 +290,92 @@ class _LessonViewPageState extends ConsumerState<LessonViewPage> {
 
                 // Bottom Action Bar (Complete & Prev/Next)
                 if (course.isEnrolled)
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).scaffoldBackgroundColor,
-                      border: Border(
-                        top: BorderSide(color: Colors.grey.shade300),
+                  SafeArea(
+                    top: false,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
                       ),
-                    ),
-                    child: Row(
-                      children: [
-                        if (prevLesson != null)
-                          IconButton.outlined(
-                            tooltip: 'Previous Lesson',
-                            onPressed: () {
-                              context.pushReplacement(
-                                '/courses/${widget.courseSlug}/lessons/${prevLesson!.slug}',
-                              );
-                            },
-                            icon: const Icon(Icons.arrow_back_rounded),
-                          ),
-                        if (prevLesson != null) const SizedBox(width: 10),
-                        Expanded(
-                          child: FilledButton.icon(
-                            onPressed: _isCompleting
-                                ? null
-                                : () => _completeLesson(targetLesson!.id),
-                            style: FilledButton.styleFrom(
-                              backgroundColor: targetLesson.isCompleted
-                                  ? Colors.green.shade700
-                                  : Colors.indigo,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).scaffoldBackgroundColor,
+                        border: Border(
+                          top: BorderSide(color: Colors.grey.shade300),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          if (prevLesson != null) ...[
+                            IconButton.outlined(
+                              tooltip: 'Previous Lesson',
+                              onPressed: () {
+                                context.pushReplacement(
+                                  '/courses/${widget.courseSlug}/lessons/${prevLesson!.slug}',
+                                );
+                              },
+                              icon: const Icon(Icons.arrow_back_rounded, size: 20),
                             ),
-                            icon: _isCompleting
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
+                            const SizedBox(width: 8),
+                          ],
+                          Expanded(
+                            child: FilledButton.icon(
+                              onPressed: _isCompleting
+                                  ? null
+                                  : () => _completeLesson(targetLesson!.id),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: targetLesson.isCompleted
+                                    ? Colors.green.shade700
+                                    : Colors.indigo,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                  horizontal: 10,
+                                ),
+                              ),
+                              icon: _isCompleting
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : Icon(
+                                      targetLesson.isCompleted
+                                          ? Icons.check_circle_outline
+                                          : Icons.task_alt_rounded,
+                                      size: 18,
                                     ),
-                                  )
-                                : Icon(
-                                    targetLesson.isCompleted
-                                        ? Icons.check_circle_outline
-                                        : Icons.task_alt_rounded,
+                              label: Flexible(
+                                child: Text(
+                                  targetLesson.isCompleted
+                                      ? 'COMPLETED'
+                                      : 'MARK AS COMPLETED',
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.6,
+                                    fontSize: 13,
                                   ),
-                            label: Text(
-                              targetLesson.isCompleted
-                                  ? 'LESSON COMPLETED'
-                                  : 'MARK AS COMPLETED (+50 XP)',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.8,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                        if (nextLesson != null) const SizedBox(width: 10),
-                        if (nextLesson != null)
-                          IconButton.filledTonal(
-                            tooltip: 'Next Lesson',
-                            onPressed: () {
-                              context.pushReplacement(
-                                '/courses/${widget.courseSlug}/lessons/${nextLesson!.slug}',
-                              );
-                            },
-                            icon: const Icon(Icons.arrow_forward_rounded),
-                          ),
-                      ],
+                          if (nextLesson != null) ...[
+                            const SizedBox(width: 8),
+                            IconButton.filledTonal(
+                              tooltip: 'Next Lesson',
+                              onPressed: () {
+                                context.pushReplacement(
+                                  '/courses/${widget.courseSlug}/lessons/${nextLesson!.slug}',
+                                );
+                              },
+                              icon: const Icon(Icons.arrow_forward_rounded, size: 20),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
                   ),
               ],

@@ -13,9 +13,20 @@ from app.schemas.problem import (
     SubmissionSummaryResponse,
     TrialResultResponse,
 )
+from app.services.code_execution.executor_factory import get_executor_status
 from app.services.judge_service import JudgeService
 
 router = APIRouter()
+
+
+@router.get("/executor-status")
+def check_executor_status(
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Check the current backend code execution engine status (Judge0 vs Subprocess fallback).
+    """
+    return get_executor_status()
 
 
 @router.get("/lesson/{lesson_slug}", response_model=ProblemDetailResponse)

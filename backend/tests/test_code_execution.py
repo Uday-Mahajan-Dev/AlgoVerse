@@ -78,6 +78,43 @@ print(" ".join(reversed(data)))
         self.assertTrue(result.compile_error)
         self.assertIn("requires the Judge0 execution engine", result.stderr)
 
+    def test_subprocess_executor_cpp_docker_requirement_message(self):
+        executor = SubprocessExecutor()
+        for lang in ("cpp", "c++", "CPP", "C++"):
+            result = executor.execute(
+                source_code="int main() { return 0; }",
+                language=lang,
+                stdin_input="",
+                time_limit_ms=2000,
+                memory_limit_mb=64,
+            )
+            self.assertTrue(result.compile_error)
+            self.assertIn("requires the Judge0 execution engine", result.stderr)
+
+    def test_subprocess_executor_python_aliases(self):
+        executor = SubprocessExecutor()
+        for lang in ("python", "python3", "py", "PYTHON", "PyThOn3"):
+            result = executor.execute(
+                source_code="print('ok')",
+                language=lang,
+                stdin_input="",
+                time_limit_ms=2000,
+                memory_limit_mb=64,
+            )
+            self.assertFalse(result.compile_error)
+            self.assertEqual(result.exit_code, 0)
+            self.assertEqual(result.stdout.strip(), "ok")
+
+    def test_executor_status_structure(self):
+        from app.services.code_execution.executor_factory import get_executor_status
+        status = get_executor_status()
+        self.assertIn("executor", status)
+        self.assertIn("judge0_url", status)
+        self.assertIn("reachable", status)
+        self.assertIn("supported_languages", status)
+        self.assertIn("python", status["supported_languages"])
+
 
 if __name__ == "__main__":
     unittest.main()
+

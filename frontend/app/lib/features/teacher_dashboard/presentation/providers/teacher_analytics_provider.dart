@@ -1,9 +1,22 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/network/api_client.dart';
+import '../../../../core/storage/token_storage.dart';
 import '../../data/datasources/teacher_analytics_remote_data_source.dart';
 import '../../data/repositories/teacher_analytics_repository_impl.dart';
 import '../../domain/entities/teacher_analytics_entity.dart';
 import '../../domain/repositories/teacher_analytics_repository.dart';
+
+final currentUserProfileProvider =
+    FutureProvider<Map<String, dynamic>>((ref) async {
+  final token = await TokenStorage.getAccessToken();
+  if (token == null || token.isEmpty) return {};
+  try {
+    return await ApiClient.me(token);
+  } catch (_) {
+    return {};
+  }
+});
 
 final teacherAnalyticsDataSourceProvider =
     Provider<TeacherAnalyticsRemoteDataSource>((ref) {

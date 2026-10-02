@@ -36,7 +36,12 @@ class Judge0Executor(BaseCodeExecutor):
         time_limit_ms: int = 2000,
         memory_limit_mb: int = 64,
     ) -> ExecutionResult:
-        lang_key = language.lower()
+        lang_key = (language or "").strip().lower()
+        if lang_key == "c++":
+            lang_key = "cpp"
+        elif lang_key in ("python3", "py"):
+            lang_key = "python"
+
         if lang_key not in self.LANGUAGE_IDS:
             return ExecutionResult(
                 stdout="",
@@ -51,12 +56,15 @@ class Judge0Executor(BaseCodeExecutor):
         language_id = self.LANGUAGE_IDS[lang_key]
         endpoint = f"{settings.JUDGE0_API_URL.rstrip('/')}/submissions?base64_encoded=false&wait=true"
 
+        min_mem_kb = 512000 if lang_key == "java" else 128000
         payload = {
             "source_code": source_code,
             "language_id": language_id,
             "stdin": stdin_input,
             "cpu_time_limit": max(0.5, time_limit_ms / 1000.0),
-            "memory_limit": max(2048, memory_limit_mb * 1024),  # in KB
+            "memory_limit": max(min_mem_kb, memory_limit_mb * 1024),  # in KB
+            "enable_per_process_and_thread_time_limit": True,
+            "enable_per_process_and_thread_memory_limit": True,
         }
 
         try:

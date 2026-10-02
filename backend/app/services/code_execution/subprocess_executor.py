@@ -55,23 +55,22 @@ class SubprocessExecutor(BaseCodeExecutor):
         time_limit_ms: int = 2000,
         memory_limit_mb: int = 64,
     ) -> ExecutionResult:
-        lang_key = language.lower()
+        lang_key = (language or "").strip().lower()
 
-        if lang_key in ("java", "cpp", "c++"):
+        if lang_key not in ("python", "python3", "py"):
+            if lang_key in ("java", "cpp", "c++", "c", "javascript", "js", "typescript", "ts"):
+                return ExecutionResult(
+                    stdout="",
+                    stderr="This language requires the Judge0 execution engine. Please start Docker and run docker-compose up.",
+                    exit_code=1,
+                    execution_time_ms=0,
+                    memory_used_kb=0,
+                    timed_out=False,
+                    compile_error=True,
+                )
             return ExecutionResult(
                 stdout="",
-                stderr="This language requires the Judge0 execution engine. Please start Docker and run docker-compose up.",
-                exit_code=1,
-                execution_time_ms=0,
-                memory_used_kb=0,
-                timed_out=False,
-                compile_error=True,
-            )
-
-        if lang_key != "python":
-            return ExecutionResult(
-                stdout="",
-                stderr=f"Unsupported language: '{language}'.",
+                stderr=f"Unsupported language: '{language}'. This language requires Judge0 or Python local executor.",
                 exit_code=1,
                 execution_time_ms=0,
                 memory_used_kb=0,
@@ -104,14 +103,25 @@ class SubprocessExecutor(BaseCodeExecutor):
                 timed_out=False,
                 compile_error=True,
             )
+        except Exception as e:
+            return ExecutionResult(
+                stdout="",
+                stderr=f"CompileError: {str(e)}",
+                exit_code=1,
+                execution_time_ms=0,
+                memory_used_kb=0,
+                timed_out=False,
+                compile_error=True,
+            )
 
         # 2. Subprocess Execution
         timeout_seconds = max(0.5, time_limit_ms / 1000.0)
         start_time = time.perf_counter()
 
         try:
+            python_bin = sys.executable or "python"
             process = subprocess.Popen(
-                [sys.executable, "-u", "-c", source_code],
+                [python_bin, "-u", "-c", source_code],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -149,7 +159,7 @@ class SubprocessExecutor(BaseCodeExecutor):
         except Exception as e:
             return ExecutionResult(
                 stdout="",
-                stderr=f"Execution error: {str(e)}",
+                stderr=f"Runtime error: {str(e)}",
                 exit_code=1,
                 execution_time_ms=0,
                 memory_used_kb=0,

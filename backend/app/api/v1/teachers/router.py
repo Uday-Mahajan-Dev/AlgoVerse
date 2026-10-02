@@ -19,6 +19,10 @@ from app.schemas.teacher_analytics import (
     TeacherOverviewResponse,
 )
 from app.schemas.teachers import (
+    EducatorRegistrationRequest,
+    EducatorRegistrationResponse,
+    JoinClassRequest,
+    JoinClassResponse,
     MyTeacherResponse,
     TeacherListItem,
     TeacherProfileResponse,
@@ -35,6 +39,44 @@ router = APIRouter(
 # ============================================================
 # TEACHER DISCOVERY & SELECTION (STUDENT / PUBLIC)
 # ============================================================
+
+@router.post(
+    "/register-educator",
+    response_model=EducatorRegistrationResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Self-serve instant educator registration with unique class code",
+)
+def register_educator(
+    request: EducatorRegistrationRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return TeacherService.register_educator(
+        db=db,
+        user_id=current_user.id,
+        institution_name=request.institution_name,
+        subject_expertise=request.subject_expertise,
+        bio=request.bio,
+    )
+
+
+@router.post(
+    "/join-class",
+    response_model=JoinClassResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Join an educator's class using a unique 6-character class joining code",
+)
+def join_class(
+    request: JoinClassRequest,
+    current_student: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return TeacherService.join_class_by_code(
+        db=db,
+        student_id=current_student.id,
+        class_code=request.class_code,
+    )
+
 
 @router.get(
     "",
@@ -63,6 +105,7 @@ def get_my_teacher(
         db=db,
         student_id=current_student.id,
     )
+
 
 
 # ============================================================

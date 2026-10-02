@@ -8,8 +8,11 @@ import '../features/courses/presentation/pages/course_catalog_page.dart';
 import '../features/courses/presentation/pages/course_detail_page.dart';
 import '../features/courses/presentation/pages/lesson_view_page.dart';
 import '../features/home/presentation/pages/home_page.dart';
+import '../features/profile/presentation/pages/profile_page.dart';
 import '../features/splash/presentation/pages/splash_page.dart';
 import '../features/student_dashboard/presentation/pages/student_dashboard_page.dart';
+import '../features/teacher_dashboard/presentation/pages/teacher_dashboard_page.dart';
+import '../features/teacher_onboarding/presentation/pages/become_educator_page.dart';
 import '../features/teachers/presentation/pages/teacher_catalog_page.dart';
 import '../features/teachers/presentation/pages/teacher_profile_page.dart';
 
@@ -49,6 +52,26 @@ final appRouter = GoRouter(
     GoRoute(
       path: AppRoutes.studentDashboard,
       builder: (context, state) => const StudentDashboardPage(),
+    ),
+
+    GoRoute(
+      path: '/teacher-dashboard',
+      builder: (context, state) => const TeacherDashboardPage(),
+    ),
+
+    GoRoute(
+      path: AppRoutes.teacher,
+      builder: (context, state) => const TeacherDashboardPage(),
+    ),
+
+    GoRoute(
+      path: AppRoutes.becomeEducator,
+      builder: (context, state) => const BecomeEducatorPage(),
+    ),
+
+    GoRoute(
+      path: AppRoutes.profile,
+      builder: (context, state) => const ProfilePage(),
     ),
 
     GoRoute(

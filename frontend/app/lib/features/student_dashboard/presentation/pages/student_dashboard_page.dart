@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_routes.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/token_storage.dart';
 import '../../../courses/domain/entities/course_entity.dart';
 import '../../../courses/presentation/providers/course_provider.dart';
@@ -268,6 +269,11 @@ class DashboardHeader extends StatelessWidget {
           ),
         ),
         IconButton(
+          onPressed: () => context.push(AppRoutes.profile),
+          icon: const Icon(Icons.person_outline_rounded),
+          tooltip: 'Profile & Settings',
+        ),
+        IconButton(
           onPressed: isLoggingOut ? null : () {},
           icon: const Icon(Icons.notifications_none_outlined),
           tooltip: 'Notifications',
@@ -475,48 +481,62 @@ class ContinueLearningCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Top row with Category and Content Type chip
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.indigo.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        item.courseTitle.toUpperCase(),
-                        style: TextStyle(
-                          fontSize: 11,
-                          letterSpacing: 1,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.indigo.shade800,
+                // Top row with Category and Content Type chip (Wrap & LayoutBuilder prevent overflow on mobile)
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final maxBadgeWidth =
+                        (constraints.maxWidth - 90).clamp(100.0, double.infinity);
+                    return Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.indigo.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: ConstrainedBox(
+                            constraints:
+                                BoxConstraints(maxWidth: maxBadgeWidth),
+                            child: Text(
+                              item.courseTitle.toUpperCase(),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                              style: TextStyle(
+                                fontSize: 11,
+                                letterSpacing: 1,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.indigo.shade800,
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: typeColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        item.contentType.toUpperCase(),
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: typeColor,
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: typeColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            item.contentType.toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: typeColor,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  ],
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 14),
 
@@ -1284,7 +1304,7 @@ class ActivityTile extends StatelessWidget {
 // MENTOR SECTION
 //
 
-class MentorSection extends StatelessWidget {
+class MentorSection extends ConsumerStatefulWidget {
   final AsyncValue<MyTeacherEntity> myTeacherAsync;
 
   const MentorSection({
@@ -1293,8 +1313,64 @@ class MentorSection extends StatelessWidget {
   });
 
   @override
+  ConsumerState<MentorSection> createState() => _MentorSectionState();
+}
+
+class _MentorSectionState extends ConsumerState<MentorSection> {
+  final _codeController = TextEditingController();
+  bool _isJoining = false;
+
+  @override
+  void dispose() {
+    _codeController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _joinByCode() async {
+    final code = _codeController.text.trim().toUpperCase();
+    if (code.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a 6-character class code')),
+      );
+      return;
+    }
+
+    setState(() => _isJoining = true);
+    try {
+      final token = await TokenStorage.getAccessToken();
+      if (token == null) throw Exception('Please log in first.');
+
+      final res =
+          await ApiClient.joinClass(accessToken: token, classCode: code);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFF10B981),
+            content:
+                Text(res['message']?.toString() ?? 'Joined class successfully!'),
+          ),
+        );
+        _codeController.clear();
+        ref.invalidate(myTeacherProvider);
+        ref.invalidate(studentAssignmentsProvider);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.red.shade700,
+            content: Text(e.toString().replaceAll('Exception:', '').trim()),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isJoining = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return myTeacherAsync.when(
+    return widget.myTeacherAsync.when(
       loading: () => const SizedBox.shrink(),
       error: (error, stackTrace) => const SizedBox.shrink(),
       data: (myTeacher) {
@@ -1396,10 +1472,10 @@ class MentorSection extends StatelessWidget {
           );
         }
 
-        // Student has no mentor teacher yet -> Show CTA Banner
+        // Student has no mentor teacher yet -> Show Class Code Join & Catalog CTA
         return Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(22),
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
@@ -1409,7 +1485,7 @@ class MentorSection extends StatelessWidget {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(22),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1423,7 +1499,7 @@ class MentorSection extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(
-                      Icons.person_search_rounded,
+                      Icons.class_outlined,
                       color: Colors.white,
                       size: 24,
                     ),
@@ -1431,10 +1507,10 @@ class MentorSection extends StatelessWidget {
                   const SizedBox(width: 12),
                   const Expanded(
                     child: Text(
-                      'Choose Your Mentor Teacher',
+                      'Join a Class via Code',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 17,
+                        fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -1443,7 +1519,7 @@ class MentorSection extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               const Text(
-                'Connect with a verified faculty mentor to track your learning journey and get personalized problem guidance.',
+                'Enter the 6-character class code provided by your educator to link your learning analytics and receive assignments.',
                 style: TextStyle(
                   color: Colors.white70,
                   fontSize: 13,
@@ -1451,17 +1527,74 @@ class MentorSection extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              FilledButton.tonal(
-                onPressed: () {
-                  context.push(AppRoutes.teachers);
-                },
-                style: FilledButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: Colors.indigo.shade900,
+              // Class Code Input Row
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                child: const Text(
-                  'Explore Teachers Catalog',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _codeController,
+                        textCapitalization: TextCapitalization.characters,
+                        decoration: const InputDecoration(
+                          hintText: 'e.g. VIT-892',
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.5,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton(
+                      onPressed: _isJoining ? null : _joinByCode,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.indigo.shade800,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: _isJoining
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text(
+                              'Join Class',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () {
+                    context.push(AppRoutes.teachers);
+                  },
+                  icon: const Icon(Icons.person_search_outlined,
+                      size: 18, color: Colors.white70),
+                  label: const Text(
+                    'Or Browse Educator Catalog',
+                    style: TextStyle(color: Colors.white70, fontSize: 13),
+                  ),
                 ),
               ),
             ],

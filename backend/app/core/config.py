@@ -72,7 +72,7 @@ class Settings(BaseSettings):
     # Code Execution Engine (Judge0)
     # ==========================================
 
-    JUDGE0_API_URL: str = "http://localhost:2358"
+    JUDGE0_API_URL: str = ""
 
     # ==========================================
     # AI Mentorship & Tutor

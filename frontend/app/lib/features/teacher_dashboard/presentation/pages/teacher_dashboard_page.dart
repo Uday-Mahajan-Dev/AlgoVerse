@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -195,49 +196,148 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
   }
 
   Widget _buildHeader(BuildContext context) {
-    return Wrap(
-      spacing: 16,
-      runSpacing: 12,
-      alignment: WrapAlignment.spaceBetween,
-      crossAxisAlignment: WrapCrossAlignment.center,
+    final userProfileAsync = ref.watch(currentUserProfileProvider);
+    final classCode =
+        userProfileAsync.value?['class_code']?.toString() ?? '';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        Wrap(
+          spacing: 16,
+          runSpacing: 12,
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            Text(
-              'Classroom Analytics',
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: const Color(0xFF0F172A),
-                  ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Classroom Analytics',
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF0F172A),
+                      ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Real-time student mastery, bottleneck detection, and homework management.',
+                  style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                ),
+              ],
             ),
-            const SizedBox(height: 4),
-            Text(
-              'Real-time student mastery, bottleneck detection, and homework management.',
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+            FilledButton.icon(
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (ctx) => const AssignHomeworkDialog(),
+                );
+              },
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.indigo,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              icon: const Icon(Icons.assignment_add, size: 18),
+              label: const Text(
+                'Assign Homework',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
             ),
           ],
         ),
-        FilledButton.icon(
-          onPressed: () {
-            showDialog(
-              context: context,
-              builder: (ctx) => const AssignHomeworkDialog(),
-            );
-          },
-          style: FilledButton.styleFrom(
-            backgroundColor: Colors.indigo,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+        if (classCode.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.purple.shade50,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.purple.shade200),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.purple.shade100,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.vpn_key_rounded,
+                    color: Colors.purple,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 8,
+                        children: [
+                          const Text(
+                            'Your Class Joining Code:',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.purple.shade700,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              classCode,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.5,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Share this code with your students to automatically link them to your dashboard roster.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.purple.shade900,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.copy_rounded,
+                      color: Colors.purple, size: 20),
+                  tooltip: 'Copy Class Code',
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: classCode));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                            'Class Code ($classCode) copied to clipboard!'),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                ),
+              ],
             ),
           ),
-          icon: const Icon(Icons.assignment_add, size: 18),
-          label: const Text(
-            'Assign Homework',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-        ),
+        ],
       ],
     );
   }

@@ -60,6 +60,10 @@ class UserResponse(UserBase):
     email_verified: bool
     phone_verified: bool
 
+    class_code: str | None = None
+    institution_name: str | None = None
+    subject_expertise: str | None = None
+
     created_at: datetime
     updated_at: datetime
 
@@ -69,6 +73,14 @@ class UserResponse(UserBase):
 
     @classmethod
     def from_user(cls, user):
+        class_code = None
+        institution_name = None
+        subject_expertise = None
+        if hasattr(user, "teacher_profile") and user.teacher_profile:
+            class_code = user.teacher_profile.class_code
+            institution_name = user.teacher_profile.institution_name
+            subject_expertise = user.teacher_profile.subject_expertise
+
         return cls(
             username=user.username,
             email=user.email,
@@ -89,6 +101,9 @@ class UserResponse(UserBase):
             is_active=user.is_active,
             email_verified=user.email_verified,
             phone_verified=user.phone_verified,
+            class_code=class_code,
+            institution_name=institution_name,
+            subject_expertise=subject_expertise,
             created_at=user.created_at,
             updated_at=user.updated_at,
         )

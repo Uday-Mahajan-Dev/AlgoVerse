@@ -1,13 +1,36 @@
 import 'dart:convert';
+import 'dart:io' show Platform;
 
+import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:http/http.dart' as http;
 
 import '../constants/app_constants.dart';
+import '../storage/token_storage.dart';
+
+String get defaultBaseUrl {
+  const envUrl = String.fromEnvironment('API_URL');
+  if (envUrl.isNotEmpty) return envUrl;
+
+  if (kIsWeb) return 'http://127.0.0.1:8000';
+  if (!kIsWeb && Platform.isAndroid) return 'http://10.0.2.2:8000';
+  return 'http://127.0.0.1:8000';
+}
 
 class ApiClient {
   ApiClient._();
 
-  static const String baseUrl = 'http://10.0.2.2:8000/api/v1';
+  static String get defaultBaseUrl {
+    const envUrl = String.fromEnvironment('API_URL');
+    if (envUrl.isNotEmpty) return envUrl;
+
+    if (kIsWeb) return 'http://127.0.0.1:8000';
+    if (!kIsWeb && Platform.isAndroid) return 'http://10.0.2.2:8000';
+    return 'http://127.0.0.1:8000';
+  }
+
+  static String get host => defaultBaseUrl;
+
+  static String get baseUrl => '$defaultBaseUrl/api/v1';
 
   static Future<Map<String, dynamic>> _handleResponse(
     http.Response response,
@@ -153,11 +176,25 @@ class ApiClient {
         )
         .timeout(AppConstants.requestTimeout);
 
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      debugPrint(
+        '[ApiClient] social-login failed with status ${response.statusCode}: ${response.body}',
+      );
+      String errorMessage = 'Backend login failed (HTTP ${response.statusCode})';
+      try {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map && decoded.containsKey('detail')) {
+          errorMessage = '${decoded['detail']} (HTTP ${response.statusCode})';
+        }
+      } catch (_) {}
+      throw Exception(errorMessage);
+    }
+
     return _handleResponse(response);
   }
 
   // ============================================================
-  // CURRENT USER
+  // CURRENT USER & ROLE
   // ============================================================
 
   static Future<Map<String, dynamic>> me(String accessToken) async {
@@ -166,6 +203,50 @@ class ApiClient {
           Uri.parse('$baseUrl/auth/me'),
           headers: {
             'Authorization': 'Bearer $accessToken',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> updateRole({
+    required String accessToken,
+    required String role,
+  }) async {
+    final response = await http
+        .patch(
+          Uri.parse('$baseUrl/users/me/role'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: jsonEncode({'role': role}),
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> updateMyRole(
+    String role, {
+    String? accessToken,
+  }) async {
+    final token = accessToken ?? await TokenStorage.getAccessToken() ?? '';
+    return updateRole(accessToken: token, role: role);
+  }
+
+  static Future<Map<String, dynamic>> getExecutorStatus({
+    String? accessToken,
+  }) async {
+    final token = accessToken ?? await TokenStorage.getAccessToken() ?? '';
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/problems/executor-status'),
+          headers: {
+            'Authorization': 'Bearer $token',
             'Accept': 'application/json',
           },
         )
@@ -333,6 +414,52 @@ class ApiClient {
             'Authorization': 'Bearer $accessToken',
             'Accept': 'application/json',
           },
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> registerEducator({
+    required String accessToken,
+    required String institutionName,
+    required String subjectExpertise,
+    String? bio,
+  }) async {
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/teachers/register-educator'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: jsonEncode({
+            'institution_name': institutionName,
+            'subject_expertise': subjectExpertise,
+            if (bio != null && bio.isNotEmpty) 'bio': bio,
+          }),
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> joinClass({
+    required String accessToken,
+    required String classCode,
+  }) async {
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/teachers/join-class'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: jsonEncode({
+            'class_code': classCode,
+          }),
         )
         .timeout(AppConstants.requestTimeout);
 

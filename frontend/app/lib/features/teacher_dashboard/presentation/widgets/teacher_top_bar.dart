@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../../core/constants/app_routes.dart';
 
 class TeacherTopBar extends StatelessWidget {
   final VoidCallback? onMenuPressed;
@@ -53,10 +56,22 @@ class TeacherTopBar extends StatelessWidget {
           IconButton(
             onPressed: () {},
             icon: const Icon(Icons.notifications_none_rounded),
+            tooltip: 'Notifications',
           ),
           const SizedBox(width: 8),
-          const CircleAvatar(
-            child: Icon(Icons.person_rounded),
+          Tooltip(
+            message: 'Profile & Settings',
+            child: InkWell(
+              borderRadius: BorderRadius.circular(20),
+              onTap: () => context.push(AppRoutes.profile),
+              child: CircleAvatar(
+                backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.15),
+                child: Icon(
+                  Icons.person_rounded,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+            ),
           ),
         ],
       ),

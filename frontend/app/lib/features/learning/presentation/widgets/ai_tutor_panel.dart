@@ -13,6 +13,7 @@ class AITutorPanel extends ConsumerStatefulWidget {
   final String? Function()? getCode;
   final String? Function()? getErrorInfo;
   final VoidCallback? onClose;
+  final bool isBottomSheet;
 
   const AITutorPanel({
     super.key,
@@ -22,7 +23,35 @@ class AITutorPanel extends ConsumerStatefulWidget {
     this.getCode,
     this.getErrorInfo,
     this.onClose,
+    this.isBottomSheet = false,
   });
+
+  static Future<void> showAsModalBottomSheet(
+    BuildContext context, {
+    required String lessonId,
+    String? submissionId,
+    Map<String, dynamic>? Function()? getVisualizationState,
+    String? Function()? getCode,
+    String? Function()? getErrorInfo,
+  }) {
+    return showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => FractionallySizedBox(
+        heightFactor: 0.85,
+        child: AITutorPanel(
+          lessonId: lessonId,
+          submissionId: submissionId,
+          getVisualizationState: getVisualizationState,
+          getCode: getCode,
+          getErrorInfo: getErrorInfo,
+          isBottomSheet: true,
+          onClose: () => Navigator.of(ctx).pop(),
+        ),
+      ),
+    );
+  }
 
   @override
   ConsumerState<AITutorPanel> createState() => _AITutorPanelState();
@@ -59,15 +88,26 @@ class _AITutorPanelState extends ConsumerState<AITutorPanel> {
     final aiStatusAsync = ref.watch(aiStatusProvider);
     final aiState = ref.watch(aiTutorNotifierProvider);
     final recommendationsAsync = ref.watch(aiRecommendationsProvider);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600 || widget.isBottomSheet;
 
     return Container(
-      width: 420,
-      constraints: const BoxConstraints(maxWidth: 460),
+      width: isMobile ? screenWidth : 420,
+      constraints: BoxConstraints(
+        maxWidth: isMobile ? 500 : 460,
+      ),
       decoration: BoxDecoration(
         color: const Color(0xFF141926),
-        border: const Border(
-          left: BorderSide(color: Color(0xFF2D3748), width: 1.5),
-        ),
+        borderRadius: widget.isBottomSheet
+            ? const BorderRadius.vertical(top: Radius.circular(20))
+            : BorderRadius.zero,
+        border: widget.isBottomSheet
+            ? const Border(
+                top: BorderSide(color: Color(0xFF2D3748), width: 1.5),
+              )
+            : const Border(
+                left: BorderSide(color: Color(0xFF2D3748), width: 1.5),
+              ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.4),
@@ -79,6 +119,19 @@ class _AITutorPanelState extends ConsumerState<AITutorPanel> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (widget.isBottomSheet)
+            Center(
+              child: Container(
+                margin: const EdgeInsets.only(top: 10, bottom: 2),
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade600,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+
           // Header
           _buildHeader(context),
           const Divider(color: Color(0xFF2D3748), height: 1),

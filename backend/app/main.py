@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.api.router import api_router
@@ -15,6 +16,13 @@ app = FastAPI(
     debug=settings.DEBUG,
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.add_middleware(
     SessionMiddleware,
@@ -28,6 +36,13 @@ app.include_router(
     api_router,
     prefix=settings.API_V1_PREFIX,
 )
+
+
+@app.get("/health")
+def health():
+    return {
+        "status": "ok"
+    }
 
 
 @app.get("/")

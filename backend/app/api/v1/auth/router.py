@@ -116,6 +116,20 @@ def social_login(
 
 
 @router.post(
+    "/google",
+    response_model=Token,
+)
+def google_login(
+    data: SocialLoginRequest,
+    db: Session = Depends(get_db),
+):
+    return SocialAuthService.login(
+        db=db,
+        id_token=data.id_token,
+    )
+
+
+@router.post(
     "/teacher-invitations",
     response_model=TeacherInvitationResponse,
     status_code=201,

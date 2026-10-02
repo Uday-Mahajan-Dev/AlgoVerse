@@ -14,15 +14,11 @@ class StudentDashboardRemoteDataSource implements StudentDashboardDataSource {
     final token = await TokenStorage.getAccessToken();
 
     if (token == null || token.isEmpty) {
-      return StudentDashboardModel.defaultSample();
+      throw Exception('Not authenticated. Please log in.');
     }
 
-    try {
-      final json = await ApiClient.getStudentDashboard(token);
-      return StudentDashboardModel.fromJson(json);
-    } catch (_) {
-      return StudentDashboardModel.defaultSample();
-    }
+    final json = await ApiClient.getStudentDashboard(token);
+    return StudentDashboardModel.fromJson(json);
   }
 
   @override
@@ -33,13 +29,9 @@ class StudentDashboardRemoteDataSource implements StudentDashboardDataSource {
       return null;
     }
 
-    try {
-      final json = await ApiClient.getContinueLearning(token);
-      if (json == null) return null;
-      return ContinueLearningModel.fromJson(json);
-    } catch (_) {
-      return null;
-    }
+    final json = await ApiClient.getContinueLearning(token);
+    if (json == null) return null;
+    return ContinueLearningModel.fromJson(json);
   }
 
   @override
@@ -47,26 +39,11 @@ class StudentDashboardRemoteDataSource implements StudentDashboardDataSource {
     final token = await TokenStorage.getAccessToken();
 
     if (token == null || token.isEmpty) {
-      return const StudentMetricsModel(
-        totalCoursesEnrolled: 0,
-        totalLessonsCompleted: 0,
-        totalVisualizationsCompleted: 0,
-        totalProblemsSolved: 0,
-        currentStreak: 0,
-      );
+      throw Exception('Not authenticated. Please log in.');
     }
 
-    try {
-      final json = await ApiClient.getStudentMetrics(token);
-      return StudentMetricsModel.fromJson(json);
-    } catch (_) {
-      return const StudentMetricsModel(
-        totalCoursesEnrolled: 0,
-        totalLessonsCompleted: 0,
-        totalVisualizationsCompleted: 0,
-        totalProblemsSolved: 0,
-        currentStreak: 0,
-      );
-    }
+    final json = await ApiClient.getStudentMetrics(token);
+    return StudentMetricsModel.fromJson(json);
   }
 }
+

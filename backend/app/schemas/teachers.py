@@ -14,6 +14,8 @@ class TeacherListItem(BaseModel):
     country: str | None = None
     student_count: int = 0
     specialty: str | None = None
+    institution_name: str | None = None
+    class_code: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -29,6 +31,8 @@ class TeacherProfileResponse(BaseModel):
     country: str | None = None
     student_count: int = 0
     specialty: str | None = None
+    institution_name: str | None = None
+    class_code: str | None = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -45,3 +49,32 @@ class MyTeacherResponse(BaseModel):
     has_teacher: bool
     teacher: TeacherProfileResponse | None = None
     selected_at: datetime | None = None
+
+
+class EducatorRegistrationRequest(BaseModel):
+    institution_name: str
+    subject_expertise: str
+    bio: str | None = None
+
+
+class EducatorRegistrationResponse(BaseModel):
+    message: str
+    role: str
+    class_code: str
+    institution_name: str
+    subject_expertise: str
+    bio: str | None = None
+
+
+class JoinClassRequest(BaseModel):
+    class_code: str
+
+
+class JoinClassResponse(BaseModel):
+    message: str
+    teacher_id: UUID
+    teacher_name: str
+    institution_name: str | None = None
+    class_code: str
+    joined_at: datetime
+

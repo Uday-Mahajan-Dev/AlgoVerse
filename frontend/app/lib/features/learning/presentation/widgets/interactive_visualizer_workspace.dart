@@ -218,11 +218,15 @@ class _InteractiveVisualizerWorkspaceState
         ? List<String>.from(widget.contentJson['algorithm_names'] as List)
         : <String>[];
 
-    final mainWorkspace = Column(
+    final headerSection = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Meta header row: Complexity & LeetCode Ref
-        Row(
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             if (complexity != null) ...[
               if (complexity['time'] != null)
@@ -233,7 +237,6 @@ class _InteractiveVisualizerWorkspaceState
                   backgroundColor: Colors.purple.shade50,
                   side: BorderSide(color: Colors.purple.shade200),
                 ),
-              const SizedBox(width: 8),
               if (complexity['space'] != null)
                 Chip(
                   avatar: const Icon(Icons.memory_outlined, size: 14),
@@ -243,7 +246,6 @@ class _InteractiveVisualizerWorkspaceState
                   side: BorderSide(color: Colors.purple.shade200),
                 ),
             ],
-            const Spacer(),
             if (leetcodeRef != null && leetcodeRef.isNotEmpty)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -334,121 +336,155 @@ class _InteractiveVisualizerWorkspaceState
           ),
           const SizedBox(height: 20),
         ],
-
-        // Visualizer Canvas
-        ArrayVisualizerWidget(
-          arrayState: currentStep?.arrayState ?? [],
-          highlights: currentStep?.highlights ?? [],
-          pointers: currentStep?.pointers ?? {},
-          operation: currentStep?.operation ?? 'INIT',
-        ),
-        const SizedBox(height: 16),
-
-        // Variable State Inspector
-        VariablePanelWidget(
-          variables: currentStep?.variables ?? {},
-          result: currentStep?.result,
-        ),
-        const SizedBox(height: 16),
-
-        // Controls (Play/Pause, Slider, Speeds)
-        VisualizerControls(
-          currentStep: _currentStepIndex,
-          totalSteps: _trace.totalSteps,
-          isPlaying: _isPlaying,
-          playbackSpeed: _playbackSpeed,
-          onPlayPause: _togglePlayPause,
-          onNext: _nextStep,
-          onPrev: _prevStep,
-          onReset: _reset,
-          onSeek: _seek,
-          onSpeedChange: _changeSpeed,
-        ),
-        const SizedBox(height: 20),
-
-        // Code Viewer with Live Line Highlight
-        if (codeSnippet.isNotEmpty) ...[
-          CodeViewerWidget(
-            codeSnippet: codeSnippet,
-            activeSourceLine: currentStep?.sourceLine ?? 1,
-            explanation: currentStep?.explanation ?? '',
-            operation: currentStep?.operation ?? 'INIT',
-          ),
-          const SizedBox(height: 20),
-        ],
-
-        // Custom Input Editor
-        InputCustomizer(
-          algorithmName: _selectedAlgorithm,
-          defaultInput: (widget.contentJson['default_input'] is Map)
-              ? Map<String, dynamic>.from(
-                  widget.contentJson['default_input'] as Map,
-                )
-              : {'array': [5, 3, 8, 1, 9]},
-          onApply: _handleCustomInput,
-        ),
       ],
     );
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isWide = constraints.maxWidth > 920;
-
-        return Stack(
+        // Visualizer Canvas + Controls + Variable State
+        final visualizerPane = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            ArrayVisualizerWidget(
+              arrayState: currentStep?.arrayState ?? [],
+              highlights: currentStep?.highlights ?? [],
+              pointers: currentStep?.pointers ?? {},
+              operation: currentStep?.operation ?? 'INIT',
+            ),
+            const SizedBox(height: 16),
+            VariablePanelWidget(
+              variables: currentStep?.variables ?? {},
+              result: currentStep?.result,
+            ),
+            const SizedBox(height: 16),
+            VisualizerControls(
+              currentStep: _currentStepIndex,
+              totalSteps: _trace.totalSteps,
+              isPlaying: _isPlaying,
+              playbackSpeed: _playbackSpeed,
+              onPlayPause: _togglePlayPause,
+              onNext: _nextStep,
+              onPrev: _prevStep,
+              onReset: _reset,
+              onSeek: _seek,
+              onSpeedChange: _changeSpeed,
+            ),
+          ],
+        );
+
+        // Code Viewer + Custom Input
+        final codeAndInputPane = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (codeSnippet.isNotEmpty) ...[
+              CodeViewerWidget(
+                codeSnippet: codeSnippet,
+                activeSourceLine: currentStep?.sourceLine ?? 1,
+                explanation: currentStep?.explanation ?? '',
+                operation: currentStep?.operation ?? 'INIT',
+              ),
+              const SizedBox(height: 20),
+            ],
+            InputCustomizer(
+              algorithmName: _selectedAlgorithm,
+              defaultInput: (widget.contentJson['default_input'] is Map)
+                  ? Map<String, dynamic>.from(
+                      widget.contentJson['default_input'] as Map,
+                    )
+                  : {'array': [5, 3, 8, 1, 9]},
+              onApply: _handleCustomInput,
+            ),
+          ],
+        );
+
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final isDesktop = constraints.maxWidth >= 800;
+            final isWideForAI = constraints.maxWidth > 920;
+
+            final Widget interactiveBody;
+            if (isDesktop) {
+              interactiveBody = Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(flex: 6, child: visualizerPane),
+                  const SizedBox(width: 18),
+                  Expanded(flex: 5, child: codeAndInputPane),
+                ],
+              );
+            } else {
+              interactiveBody = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  visualizerPane,
+                  const SizedBox(height: 20),
+                  codeAndInputPane,
+                ],
+              );
+            }
+
+            final mainWorkspace = Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(child: mainWorkspace),
-                if (_showAITutor && isWide) ...[
-                  const SizedBox(width: 16),
-                  AITutorPanel(
-                    lessonId: widget.lessonId ?? '',
-                    getVisualizationState: () => currentStep?.toJson(
-                      algorithmName: _selectedAlgorithm,
-                    ),
-                    onClose: () => setState(() => _showAITutor = false),
-                  ),
-                ],
+                headerSection,
+                const SizedBox(height: 16),
+                interactiveBody,
               ],
-            ),
+            );
 
-            // Slide-over on smaller screens
-            if (_showAITutor && !isWide)
-              Positioned(
-                top: 0,
-                bottom: 0,
-                right: 0,
-                child: AITutorPanel(
-                  lessonId: widget.lessonId ?? '',
-                  getVisualizationState: () => currentStep?.toJson(
-                    algorithmName: _selectedAlgorithm,
+            return Stack(
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: mainWorkspace),
+                    if (_showAITutor && isWideForAI) ...[
+                      const SizedBox(width: 16),
+                      AITutorPanel(
+                        lessonId: widget.lessonId ?? '',
+                        getVisualizationState: () => currentStep?.toJson(
+                          algorithmName: _selectedAlgorithm,
+                        ),
+                        onClose: () => setState(() => _showAITutor = false),
+                      ),
+                    ],
+                  ],
+                ),
+
+                // Floating AI Tutor Trigger Button
+                Positioned(
+                  bottom: 16,
+                  right: 16,
+                  child: FloatingActionButton.extended(
+                    heroTag: 'ai_tutor_viz_fab',
+                    onPressed: () {
+                      if (!isWideForAI) {
+                        AITutorPanel.showAsModalBottomSheet(
+                          context,
+                          lessonId: widget.lessonId ?? '',
+                          getVisualizationState: () => currentStep?.toJson(
+                            algorithmName: _selectedAlgorithm,
+                          ),
+                        );
+                      } else {
+                        setState(() {
+                          _showAITutor = !_showAITutor;
+                        });
+                      }
+                    },
+                    backgroundColor: const Color(0xFF6366F1),
+                    foregroundColor: Colors.white,
+                    elevation: 6,
+                    icon: const Text('🤖', style: TextStyle(fontSize: 18)),
+                    label: Text(
+                      isWideForAI && _showAITutor
+                          ? 'Hide AI Tutor'
+                          : 'Ask AI Tutor',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
                   ),
-                  onClose: () => setState(() => _showAITutor = false),
                 ),
-              ),
-
-            // Floating AI Tutor Trigger Button
-            Positioned(
-              bottom: 16,
-              right: 16,
-              child: FloatingActionButton.extended(
-                heroTag: 'ai_tutor_viz_fab',
-                onPressed: () {
-                  setState(() {
-                    _showAITutor = !_showAITutor;
-                  });
-                },
-                backgroundColor: const Color(0xFF6366F1),
-                foregroundColor: Colors.white,
-                elevation: 6,
-                icon: const Text('🤖', style: TextStyle(fontSize: 18)),
-                label: Text(
-                  _showAITutor ? 'Hide AI Tutor' : 'Ask AI Tutor',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                ),
-              ),
-            ),
           ],
         );
       },
