@@ -749,6 +749,7 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             Text(
                               '${index + 1}.',
@@ -762,6 +763,8 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
                             Expanded(
                               child: Text(
                                 b.lessonTitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 14,
@@ -769,8 +772,10 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
                                 ),
                               ),
                             ),
+                            const SizedBox(width: 10),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
                                 color: b.completionRate < 0.3
                                     ? Colors.red.shade50
@@ -797,15 +802,21 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
                         const SizedBox(height: 6),
                         Row(
                           children: [
-                            Text(
-                              '${b.courseTitle} • ${b.moduleTitle}',
-                              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                            Expanded(
+                              child: Text(
+                                '${b.courseTitle} • ${b.moduleTitle}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                    fontSize: 12, color: Colors.grey.shade500),
+                              ),
                             ),
-                            const Spacer(),
+                            const SizedBox(width: 8),
                             if (b.contentType == 'PROBLEM')
                               Text(
-                                'Failure: $failurePct% (${b.avgAttempts} avg attempts)',
-                                style: TextStyle(fontSize: 11, color: Colors.red.shade600),
+                                'Failure: $failurePct% (${b.avgAttempts} attempts)',
+                                style: TextStyle(
+                                    fontSize: 11, color: Colors.red.shade600),
                               ),
                           ],
                         ),
@@ -924,6 +935,8 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
                         Expanded(
                           child: Text(
                             c.moduleTitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 14,
@@ -931,6 +944,7 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
                             ),
                           ),
                         ),
+                        const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
@@ -951,6 +965,8 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
                     const SizedBox(height: 4),
                     Text(
                       '${c.courseTitle} • ${c.totalLessons} lessons (${c.weakLessonCount} weak)',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
                     ),
                     const SizedBox(height: 6),
@@ -1050,100 +1066,124 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
                   statusText = 'Inactive';
                 }
 
-                return Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 20,
-                      backgroundColor: Colors.indigo.shade50,
-                      child: Text(
-                        s.studentName.isNotEmpty
-                            ? s.studentName.substring(0, 1).toUpperCase()
-                            : 'S',
-                        style: TextStyle(
-                          color: Colors.indigo.shade800,
-                          fontWeight: FontWeight.bold,
+                return Padding(
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      CircleAvatar(
+                        radius: 20,
+                        backgroundColor: Colors.indigo.shade50,
+                        child: Text(
+                          s.studentName.isNotEmpty
+                              ? s.studentName.substring(0, 1).toUpperCase()
+                              : 'S',
+                          style: TextStyle(
+                            color: Colors.indigo.shade800,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      flex: 4,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Text(
-                                s.studentName,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                  color: Color(0xFF1E293B),
-                                ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              s.studentName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                                color: Color(0xFF1E293B),
                               ),
-                              const SizedBox(width: 8),
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: BoxDecoration(
-                                  color: statusColor,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                statusText,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: statusColor,
-                                ),
-                              ),
-                            ],
-                          ),
-                          Text(
-                            s.studentEmail,
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      flex: 2,
-                      child: Row(
-                        children: [
-                          const Icon(Icons.local_fire_department, size: 16, color: Colors.orange),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${s.currentStreak}d streak',
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      flex: 3,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${s.overallCompletionPct.toStringAsFixed(0)}% (${s.lessonsCompleted} lessons)',
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                          ),
-                          const SizedBox(height: 4),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: LinearProgressIndicator(
-                              value: s.overallCompletionPct / 100.0,
-                              minHeight: 5,
-                              backgroundColor: Colors.grey.shade200,
-                              valueColor: const AlwaysStoppedAnimation(Colors.indigo),
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 2),
+                            Text(
+                              s.studentEmail,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade500,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 12),
+                      SizedBox(
+                        width: 130,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                Container(
+                                  width: 7,
+                                  height: 7,
+                                  decoration: BoxDecoration(
+                                    color: statusColor,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  statusText,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: statusColor,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                const Icon(Icons.local_fire_department,
+                                    size: 14, color: Colors.orange),
+                                const SizedBox(width: 2),
+                                Text(
+                                  '${s.currentStreak}d',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                Text(
+                                  '${s.overallCompletionPct.toStringAsFixed(0)}% (${s.lessonsCompleted} done)',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.grey.shade700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(
+                                value: s.overallCompletionPct / 100.0,
+                                minHeight: 5,
+                                backgroundColor: Colors.grey.shade200,
+                                valueColor:
+                                    const AlwaysStoppedAnimation(Colors.indigo),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 );
               },
             ),
@@ -1222,6 +1262,8 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: RichText(
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         text: TextSpan(
                           style: const TextStyle(
                             fontSize: 13,
@@ -1246,6 +1288,7 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
                         ),
                       ),
                     ),
+                    const SizedBox(width: 8),
                     Text(
                       _formatAgo(item.timestamp),
                       style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
@@ -1346,6 +1389,8 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
                         children: [
                           Text(
                             a.lessonTitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 13,
@@ -1354,6 +1399,8 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
                           ),
                           Text(
                             'Assigned to ${a.studentName}${a.dueDate != null ? ' • Due ${_formatDate(a.dueDate!)}' : ''}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
                           ),
                         ],

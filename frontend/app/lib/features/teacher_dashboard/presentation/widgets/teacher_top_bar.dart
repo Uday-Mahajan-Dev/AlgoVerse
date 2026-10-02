@@ -11,14 +11,131 @@ class TeacherTopBar extends StatelessWidget {
     this.onMenuPressed,
   });
 
+  void _showNotifications(BuildContext context) {
+    final theme = Theme.of(context);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: theme.scaffoldBackgroundColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.55,
+          minChildSize: 0.35,
+          maxChildSize: 0.85,
+          expand: false,
+          builder: (scrollContext, scrollController) {
+            return Column(
+              children: [
+                const SizedBox(height: 12),
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade400,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.purple.shade50,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          Icons.notifications_active_rounded,
+                          color: Colors.purple.shade700,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Teacher Notifications & Alerts',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.of(sheetContext).pop(),
+                        icon: const Icon(Icons.close_rounded),
+                        tooltip: 'Close',
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: ListView(
+                    controller: scrollController,
+                    padding: const EdgeInsets.all(20),
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: theme.cardColor,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.grey.shade200),
+                        ),
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.notifications_paused_rounded,
+                              size: 44,
+                              color: Colors.grey.shade400,
+                            ),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'No New Notifications',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Real-time student submissions, bottleneck alerts, and TA application updates will appear here.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey.shade600,
+                                height: 1.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     return Container(
       padding: const EdgeInsets.symmetric(
-        horizontal: 24,
-        vertical: 16,
+        horizontal: 20,
+        vertical: 14,
       ),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
@@ -34,27 +151,20 @@ class TeacherTopBar extends StatelessWidget {
             IconButton(
               onPressed: onMenuPressed,
               icon: const Icon(Icons.menu_rounded),
+              tooltip: 'Navigation Menu',
             ),
             const SizedBox(width: 8),
           ],
-          Expanded(
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: 'Search students, problems, concepts...',
-                prefixIcon: const Icon(Icons.search_rounded),
-                filled: true,
-                fillColor: theme.colorScheme.surfaceContainerHighest
-                    .withValues(alpha: 0.45),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-              ),
+          Text(
+            'Faculty Analytics Hub',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: Colors.purple.shade900,
             ),
           ),
-          const SizedBox(width: 20),
+          const Spacer(),
           IconButton(
-            onPressed: () {},
+            onPressed: () => _showNotifications(context),
             icon: const Icon(Icons.notifications_none_rounded),
             tooltip: 'Notifications',
           ),
@@ -65,10 +175,13 @@ class TeacherTopBar extends StatelessWidget {
               borderRadius: BorderRadius.circular(20),
               onTap: () => context.push(AppRoutes.profile),
               child: CircleAvatar(
-                backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.15),
+                radius: 18,
+                backgroundColor:
+                    theme.colorScheme.primary.withValues(alpha: 0.15),
                 child: Icon(
                   Icons.person_rounded,
                   color: theme.colorScheme.primary,
+                  size: 20,
                 ),
               ),
             ),
@@ -77,4 +190,4 @@ class TeacherTopBar extends StatelessWidget {
       ),
     );
   }
-}
+}

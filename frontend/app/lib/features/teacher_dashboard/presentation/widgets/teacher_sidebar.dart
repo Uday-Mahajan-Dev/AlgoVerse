@@ -30,9 +30,15 @@ class TeacherSidebar extends StatelessWidget {
       await TokenStorage.clear();
       if (!context.mounted) return;
       context.go(AppRoutes.login);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Logged out successfully')),
+      );
     } catch (_) {
       if (context.mounted) {
         context.go(AppRoutes.login);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Logged out successfully')),
+        );
       }
     }
   }
@@ -79,16 +85,17 @@ class TeacherSidebar extends StatelessWidget {
                     onTap: () => onItemSelected(0),
                   ),
                   _SidebarItem(
-                    icon: Icons.people_alt_rounded,
-                    title: 'Students & Roster',
-                    selected: selectedIndex == 1,
-                    onTap: () => onItemSelected(1),
-                  ),
-                  _SidebarItem(
-                    icon: Icons.auto_stories_rounded,
-                    title: 'Course Catalog',
+                    icon: Icons.edit_note_rounded,
+                    title: 'Educator Studio (Quizzes & Problems)',
                     selected: false,
-                    onTap: () => context.push(AppRoutes.courses),
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Educator Studio coming soon!'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    },
                   ),
                   _SidebarItem(
                     icon: Icons.person_rounded,
