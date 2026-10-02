@@ -1,13 +1,13 @@
 import 'package:go_router/go_router.dart';
 
 import '../core/constants/app_routes.dart';
+import '../core/storage/token_storage.dart';
 import '../features/auth/presentation/pages/login_page.dart';
 import '../features/auth/presentation/pages/register_page.dart';
 import '../features/auth/presentation/pages/verify_email_page.dart';
 import '../features/courses/presentation/pages/course_catalog_page.dart';
 import '../features/courses/presentation/pages/course_detail_page.dart';
 import '../features/courses/presentation/pages/lesson_view_page.dart';
-import '../features/home/presentation/pages/home_page.dart';
 import '../features/profile/presentation/pages/edit_profile_page.dart';
 import '../features/profile/presentation/pages/profile_page.dart';
 import '../features/splash/presentation/pages/splash_page.dart';
@@ -46,8 +46,29 @@ final appRouter = GoRouter(
     ),
 
     GoRoute(
+      path: AppRoutes.dashboard,
+      redirect: (context, state) async {
+        final role = await TokenStorage.getUserRole();
+        if (role == 'TEACHER') {
+          return AppRoutes.teacherDashboard;
+        } else if (role == 'ADMIN') {
+          return AppRoutes.admin;
+        }
+        return AppRoutes.studentDashboard;
+      },
+    ),
+
+    GoRoute(
       path: AppRoutes.home,
-      builder: (context, state) => const HomePage(),
+      redirect: (context, state) async {
+        final role = await TokenStorage.getUserRole();
+        if (role == 'TEACHER') {
+          return AppRoutes.teacherDashboard;
+        } else if (role == 'ADMIN') {
+          return AppRoutes.admin;
+        }
+        return AppRoutes.studentDashboard;
+      },
     ),
 
     GoRoute(
@@ -56,13 +77,18 @@ final appRouter = GoRouter(
     ),
 
     GoRoute(
-      path: '/teacher-dashboard',
+      path: AppRoutes.teacherDashboard,
       builder: (context, state) => const TeacherDashboardPage(),
     ),
 
     GoRoute(
       path: AppRoutes.teacher,
       builder: (context, state) => const TeacherDashboardPage(),
+    ),
+
+    GoRoute(
+      path: AppRoutes.admin,
+      builder: (context, state) => const StudentDashboardPage(),
     ),
 
     GoRoute(

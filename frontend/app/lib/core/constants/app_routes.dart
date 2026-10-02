@@ -15,7 +15,10 @@ class AppRoutes {
   // ============================================================
 
   static const home = '/home';
+  static const dashboard = '/dashboard';
   static const studentDashboard = '/student-dashboard';
+  static const teacherDashboard = '/teacher-dashboard';
+  static const admin = '/admin';
   static const stories = '/stories';
   static const problems = '/problems';
   static const contests = '/contests';

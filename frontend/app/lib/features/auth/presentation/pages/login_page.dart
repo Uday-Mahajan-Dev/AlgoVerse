@@ -52,11 +52,11 @@ class _LoginPageState extends State<LoginPage> {
     try {
       final tokens = await ApiClient.login(email: email, password: password);
 
-      await _saveTokens(tokens);
+      final role = await _saveTokens(tokens);
 
       if (!mounted) return;
 
-      context.go(AppRoutes.home);
+      _navigateToDashboardForRole(role);
     } catch (e) {
       if (!mounted) return;
 
@@ -82,10 +82,7 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
-    await _socialLogin(
-      SocialAuthService.signInWithGoogle,
-      destination: AppRoutes.studentDashboard,
-    );
+    await _socialLogin(SocialAuthService.signInWithGoogle);
   }
 
   // ============================================================
@@ -100,16 +97,12 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
-    await _socialLogin(
-      SocialAuthService.signInWithGitHub,
-      destination: AppRoutes.home,
-    );
+    await _socialLogin(SocialAuthService.signInWithGitHub);
   }
 
   Future<void> _socialLogin(
-    Future<Map<String, dynamic>> Function() loginMethod, {
-    required String destination,
-  }) async {
+    Future<Map<String, dynamic>> Function() loginMethod,
+  ) async {
     if (kIsWeb) {
       _showMessage('Please use Email & Password to log in on Web.');
       return;
@@ -122,11 +115,11 @@ class _LoginPageState extends State<LoginPage> {
     try {
       final tokens = await loginMethod();
 
-      await _saveTokens(tokens);
+      final role = await _saveTokens(tokens);
 
       if (!mounted) return;
 
-      context.go(destination);
+      _navigateToDashboardForRole(role);
     } on UnimplementedError {
       if (!mounted) return;
       _showMessage('Please use Email & Password to log in on Web.');
@@ -146,13 +139,23 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  void _navigateToDashboardForRole(String role) {
+    final upperRole = role.toUpperCase();
+    if (upperRole == 'TEACHER') {
+      context.go(AppRoutes.teacherDashboard);
+    } else if (upperRole == 'ADMIN') {
+      context.go(AppRoutes.admin);
+    } else {
+      context.go(AppRoutes.studentDashboard);
+    }
+  }
+
   // ============================================================
   // SAVE TOKENS
   // ============================================================
 
-  Future<void> _saveTokens(Map<String, dynamic> tokens) async {
+  Future<String> _saveTokens(Map<String, dynamic> tokens) async {
     final accessToken = tokens['access_token']?.toString();
-
     final refreshToken = tokens['refresh_token']?.toString();
 
     if (accessToken == null ||
@@ -162,10 +165,19 @@ class _LoginPageState extends State<LoginPage> {
       throw Exception('Invalid authentication response from server.');
     }
 
+    String role = 'STUDENT';
+    try {
+      final user = await ApiClient.me(accessToken);
+      role = (user['role_name']?.toString() ?? 'STUDENT').toUpperCase();
+    } catch (_) {}
+
     await TokenStorage.saveTokens(
       accessToken: accessToken,
       refreshToken: refreshToken,
+      role: role,
     );
+
+    return role;
   }
 
   String _cleanError(Object error) {

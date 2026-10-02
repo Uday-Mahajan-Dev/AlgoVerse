@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/token_storage.dart';
+import '../../../auth/data/social_auth_service.dart';
 import '../../../courses/domain/entities/course_entity.dart';
 import '../../../courses/presentation/providers/course_provider.dart';
 import '../../../learning/domain/entities/ai_tutor_entity.dart';
@@ -59,11 +60,24 @@ class _StudentDashboardPageState extends ConsumerState<StudentDashboardPage> {
     });
 
     try {
+      final refreshToken = await TokenStorage.getRefreshToken();
+      if (refreshToken != null && refreshToken.isNotEmpty) {
+        try {
+          await ApiClient.logout(refreshToken);
+        } catch (_) {}
+      }
+      try {
+        await SocialAuthService.signOut();
+      } catch (_) {}
+
       await TokenStorage.clear();
 
       if (!mounted) return;
 
       context.go(AppRoutes.login);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Logged out successfully')),
+      );
     } catch (e) {
       if (!mounted) return;
 
@@ -229,11 +243,7 @@ class _StudentDashboardPageState extends ConsumerState<StudentDashboardPage> {
   }
 }
 
-//
-// HEADER
-//
-
-class DashboardHeader extends StatelessWidget {
+class DashboardHeader extends StatefulWidget {
   final StudentUser user;
   final VoidCallback onLogout;
   final bool isLoggingOut;
@@ -246,6 +256,231 @@ class DashboardHeader extends StatelessWidget {
   });
 
   @override
+  State<DashboardHeader> createState() => _DashboardHeaderState();
+}
+
+class _DashboardHeaderState extends State<DashboardHeader> {
+  bool _hasUnreadNotifications = true;
+
+  void _showNotifications(BuildContext context) {
+    setState(() {
+      _hasUnreadNotifications = false;
+    });
+
+    final theme = Theme.of(context);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: theme.scaffoldBackgroundColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.65,
+          minChildSize: 0.4,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (scrollContext, scrollController) {
+            return Column(
+              children: [
+                const SizedBox(height: 12),
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade400,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          Icons.notifications_active_rounded,
+                          color: theme.colorScheme.primary,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'System Alerts & Updates',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.of(sheetContext).pop(),
+                        icon: const Icon(Icons.close_rounded),
+                        tooltip: 'Close',
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: ListView(
+                    controller: scrollController,
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      _buildNotificationTile(
+                        icon: Icons.auto_stories_rounded,
+                        iconColor: Colors.deepPurple,
+                        title: 'Welcome to AlgoVerse!',
+                        subtitle:
+                            'Your adaptive learning portal is live. Master DSA through interactive step-by-step visualizations and hands-on coding challenges.',
+                        time: 'Just now',
+                        isNew: true,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildNotificationTile(
+                        icon: Icons.visibility_rounded,
+                        iconColor: Colors.indigo,
+                        title: 'Interactive Arrays Visualizations',
+                        subtitle:
+                            'New algorithm visualizations for Two Pointers, Sliding Window, and Prefix Sum algorithms are ready for you to explore.',
+                        time: '2 hours ago',
+                        isNew: true,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildNotificationTile(
+                        icon: Icons.assignment_turned_in_rounded,
+                        iconColor: Colors.teal,
+                        title: 'Classroom & Homework Linked',
+                        subtitle:
+                            'Join your educator\'s class using your 6-character class code to receive personalized homework assignments and direct mentor feedback.',
+                        time: '1 day ago',
+                        isNew: false,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildNotificationTile(
+                        icon: Icons.military_tech_rounded,
+                        iconColor: Colors.amber.shade800,
+                        title: 'Achievement Badges Activated',
+                        subtitle:
+                            'Unlock gamified achievement badges on your profile by solving challenges, maintaining streaks, and completing course modules.',
+                        time: '2 days ago',
+                        isNew: false,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildNotificationTile({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+    required String time,
+    required bool isNew,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isNew
+            ? iconColor.withValues(alpha: 0.06)
+            : Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isNew
+              ? iconColor.withValues(alpha: 0.3)
+              : Colors.grey.shade200,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: iconColor, size: 22),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    if (isNew)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: iconColor,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          'NEW',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade700,
+                    height: 1.3,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  time,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey.shade500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Row(
       children: [
@@ -254,7 +489,7 @@ class DashboardHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Welcome back, ${user.displayName}',
+                'Welcome back, ${widget.user.displayName}',
                 style: const TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.bold,
@@ -274,13 +509,19 @@ class DashboardHeader extends StatelessWidget {
           tooltip: 'Profile & Settings',
         ),
         IconButton(
-          onPressed: isLoggingOut ? null : () {},
-          icon: const Icon(Icons.notifications_none_outlined),
+          onPressed:
+              widget.isLoggingOut ? null : () => _showNotifications(context),
+          icon: Badge(
+            isLabelVisible: _hasUnreadNotifications,
+            smallSize: 8,
+            backgroundColor: Colors.deepOrangeAccent,
+            child: const Icon(Icons.notifications_none_outlined),
+          ),
           tooltip: 'Notifications',
         ),
         IconButton(
-          onPressed: isLoggingOut ? null : onLogout,
-          icon: isLoggingOut
+          onPressed: widget.isLoggingOut ? null : widget.onLogout,
+          icon: widget.isLoggingOut
               ? const SizedBox(
                   width: 20,
                   height: 20,

@@ -714,6 +714,28 @@ class _ProfilePageState extends State<ProfilePage> {
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                 ),
               ],
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.purple.shade700,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  onPressed: () {
+                    context.go('/teacher-dashboard');
+                  },
+                  icon: const Icon(Icons.dashboard_customize_rounded, size: 20),
+                  label: const Text(
+                    'Go to Teacher Analytics Dashboard →',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
