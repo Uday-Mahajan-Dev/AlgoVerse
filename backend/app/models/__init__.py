@@ -16,3 +16,6 @@ from .test_case import TestCase
 from .submission import Submission
 from .assignment import Assignment
 from .teacher_profile import TeacherProfile
+from .ta_approval_request import TAApprovalRequest
+from .badge import Badge
+from .user_badge import UserBadge

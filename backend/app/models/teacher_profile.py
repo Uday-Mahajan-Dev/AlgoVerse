@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import Boolean, ForeignKey, String, Text
+from sqlalchemy import Boolean, Date, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -24,6 +24,12 @@ class TeacherProfile(BaseModel):
         default="",
     )
 
+    designation: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+        default="Professor",
+    )
+
     subject_expertise: Mapped[str] = mapped_column(
         String(200),
         nullable=False,
@@ -35,10 +41,22 @@ class TeacherProfile(BaseModel):
         nullable=True,
     )
 
+    date_of_birth: Mapped[Date | None] = mapped_column(
+        Date,
+        nullable=True,
+    )
+
     class_code: Mapped[str] = mapped_column(
         String(20),
         unique=True,
         nullable=False,
+        index=True,
+    )
+
+    supervisor_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
         index=True,
     )
 
@@ -50,5 +68,11 @@ class TeacherProfile(BaseModel):
 
     user = relationship(
         "User",
+        foreign_keys=[user_id],
         back_populates="teacher_profile",
+    )
+
+    supervisor = relationship(
+        "User",
+        foreign_keys=[supervisor_id],
     )

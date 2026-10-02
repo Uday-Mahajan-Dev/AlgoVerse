@@ -322,6 +322,12 @@ class DashboardService:
                 streak += 1
                 curr -= timedelta(days=1)
 
+        if streak >= 3:
+            from app.services.badge_service import BadgeService
+            BadgeService.award_badge_if_eligible(db, student_id, "STREAK_3")
+            if streak >= 7:
+                BadgeService.award_badge_if_eligible(db, student_id, "STREAK_7")
+
         return StudentMetricsResponse(
             total_courses_enrolled=total_courses,
             total_lessons_completed=total_lessons,

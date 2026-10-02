@@ -1,4 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../../core/constants/app_routes.dart';
+import '../../../../core/network/api_client.dart';
+import '../../../../core/storage/token_storage.dart';
+import '../../../auth/data/social_auth_service.dart';
 
 class TeacherSidebar extends StatelessWidget {
   final int selectedIndex;
@@ -10,12 +16,33 @@ class TeacherSidebar extends StatelessWidget {
     required this.onItemSelected,
   });
 
+  Future<void> _logout(BuildContext context) async {
+    try {
+      final refreshToken = await TokenStorage.getRefreshToken();
+      if (refreshToken != null && refreshToken.isNotEmpty) {
+        try {
+          await ApiClient.logout(refreshToken);
+        } catch (_) {}
+      }
+      try {
+        await SocialAuthService.signOut();
+      } catch (_) {}
+      await TokenStorage.clear();
+      if (!context.mounted) return;
+      context.go(AppRoutes.login);
+    } catch (_) {
+      if (context.mounted) {
+        context.go(AppRoutes.login);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     return Container(
-      width: 250,
+      width: 260,
       color: theme.colorScheme.surface,
       child: SafeArea(
         child: Column(
@@ -25,16 +52,17 @@ class TeacherSidebar extends StatelessWidget {
               child: Row(
                 children: [
                   Icon(
-                    Icons.code_rounded,
-                    color: theme.colorScheme.primary,
+                    Icons.school_rounded,
+                    color: Colors.purple.shade700,
                     size: 30,
                   ),
                   const SizedBox(width: 10),
                   Text(
-                    'ALGOVERSE',
+                    'FACULTY HUB',
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w800,
                       letterSpacing: 1.2,
+                      color: Colors.purple.shade900,
                     ),
                   ),
                 ],
@@ -52,33 +80,21 @@ class TeacherSidebar extends StatelessWidget {
                   ),
                   _SidebarItem(
                     icon: Icons.people_alt_rounded,
-                    title: 'Students',
+                    title: 'Students & Roster',
                     selected: selectedIndex == 1,
                     onTap: () => onItemSelected(1),
                   ),
                   _SidebarItem(
-                    icon: Icons.class_rounded,
-                    title: 'Classes',
-                    selected: selectedIndex == 2,
-                    onTap: () => onItemSelected(2),
-                  ),
-                  _SidebarItem(
-                    icon: Icons.analytics_rounded,
-                    title: 'Analytics',
-                    selected: selectedIndex == 3,
-                    onTap: () => onItemSelected(3),
-                  ),
-                  _SidebarItem(
-                    icon: Icons.code_rounded,
-                    title: 'Problems',
-                    selected: selectedIndex == 4,
-                    onTap: () => onItemSelected(4),
-                  ),
-                  _SidebarItem(
                     icon: Icons.auto_stories_rounded,
-                    title: 'Learning Content',
-                    selected: selectedIndex == 5,
-                    onTap: () => onItemSelected(5),
+                    title: 'Course Catalog',
+                    selected: false,
+                    onTap: () => context.push(AppRoutes.courses),
+                  ),
+                  _SidebarItem(
+                    icon: Icons.person_rounded,
+                    title: 'Profile & Badges',
+                    selected: false,
+                    onTap: () => context.push(AppRoutes.profile),
                   ),
                 ],
               ),
@@ -86,10 +102,12 @@ class TeacherSidebar extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 20),
               child: _SidebarItem(
-                icon: Icons.settings_rounded,
-                title: 'Settings',
-                selected: selectedIndex == 6,
-                onTap: () => onItemSelected(6),
+                icon: Icons.logout_rounded,
+                title: 'Logout',
+                selected: false,
+                iconColor: Colors.red.shade700,
+                textColor: Colors.red.shade700,
+                onTap: () => _logout(context),
               ),
             ),
           ],
@@ -104,26 +122,46 @@ class _SidebarItem extends StatelessWidget {
   final String title;
   final bool selected;
   final VoidCallback onTap;
+  final Color? iconColor;
+  final Color? textColor;
 
   const _SidebarItem({
     required this.icon,
     required this.title,
     required this.selected,
     required this.onTap,
+    this.iconColor,
+    this.textColor,
   });
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: ListTile(
         onTap: onTap,
         selected: selected,
+        selectedTileColor: Colors.purple.shade50,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(12),
         ),
-        leading: Icon(icon),
-        title: Text(title),
+        leading: Icon(
+          icon,
+          color: selected
+              ? Colors.purple.shade700
+              : (iconColor ?? theme.colorScheme.onSurfaceVariant),
+        ),
+        title: Text(
+          title,
+          style: TextStyle(
+            fontWeight: selected ? FontWeight.bold : FontWeight.w500,
+            color: selected
+                ? Colors.purple.shade900
+                : (textColor ?? theme.colorScheme.onSurface),
+          ),
+        ),
       ),
     );
   }

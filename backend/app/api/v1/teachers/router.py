@@ -24,6 +24,9 @@ from app.schemas.teachers import (
     JoinClassRequest,
     JoinClassResponse,
     MyTeacherResponse,
+    TARequestResponse,
+    TAResponseActionRequest,
+    TAResponseActionResult,
     TeacherListItem,
     TeacherProfileResponse,
     TeacherSelectionResponse,
@@ -44,19 +47,57 @@ router = APIRouter(
     "/register-educator",
     response_model=EducatorRegistrationResponse,
     status_code=status.HTTP_200_OK,
-    summary="Self-serve instant educator registration with unique class code",
+    summary="Self-serve educator registration with age gate and TA supervisor approval flow",
 )
 def register_educator(
     request: EducatorRegistrationRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    bio_content = request.professional_bio or request.bio
     return TeacherService.register_educator(
         db=db,
         user_id=current_user.id,
         institution_name=request.institution_name,
+        designation=request.designation,
         subject_expertise=request.subject_expertise,
-        bio=request.bio,
+        date_of_birth=request.date_of_birth,
+        supervisor_email=request.supervisor_email,
+        bio=bio_content,
+    )
+
+
+@router.get(
+    "/ta-requests",
+    response_model=list[TARequestResponse],
+    summary="Get pending Teaching Assistant approval requests assigned to current teacher",
+)
+def get_ta_requests(
+    current_teacher: User = Depends(get_current_teacher),
+    db: Session = Depends(get_db),
+):
+    return TeacherService.get_ta_requests(
+        db=db,
+        teacher_id=current_teacher.id,
+    )
+
+
+@router.post(
+    "/ta-requests/{request_id}/respond",
+    response_model=TAResponseActionResult,
+    summary="Approve or reject a pending Teaching Assistant approval request",
+)
+def respond_to_ta_request(
+    request_id: UUID,
+    body: TAResponseActionRequest,
+    current_teacher: User = Depends(get_current_teacher),
+    db: Session = Depends(get_db),
+):
+    return TeacherService.respond_to_ta_request(
+        db=db,
+        teacher_id=current_teacher.id,
+        request_id=request_id,
+        action=body.action,
     )
 
 
@@ -64,7 +105,7 @@ def register_educator(
     "/join-class",
     response_model=JoinClassResponse,
     status_code=status.HTTP_200_OK,
-    summary="Join an educator's class using a unique 6-character class joining code",
+    summary="Join an educator's class using a unique class joining code",
 )
 def join_class(
     request: JoinClassRequest,

@@ -2,6 +2,8 @@ from datetime import date, datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 
 class UserBase(BaseModel):
@@ -26,12 +28,16 @@ class UserBase(BaseModel):
 
     gender: str | None = None
 
+    instagram_url: str | None = None
+    linkedin_url: str | None = None
+
 
 class UserCreate(UserBase):
     password: str
 
 
 class UserUpdate(BaseModel):
+    username: str | None = None
     first_name: str | None = None
     last_name: str | None = None
 
@@ -49,6 +55,9 @@ class UserUpdate(BaseModel):
 
     gender: str | None = None
 
+    instagram_url: str | None = None
+    linkedin_url: str | None = None
+
 
 class UserResponse(UserBase):
     id: UUID
@@ -62,7 +71,9 @@ class UserResponse(UserBase):
 
     class_code: str | None = None
     institution_name: str | None = None
+    designation: str | None = None
     subject_expertise: str | None = None
+    ta_application_status: str | None = None
 
     created_at: datetime
     updated_at: datetime
@@ -72,14 +83,28 @@ class UserResponse(UserBase):
     )
 
     @classmethod
-    def from_user(cls, user):
+    def from_user(cls, user, db: Session | None = None):
         class_code = None
         institution_name = None
+        designation = None
         subject_expertise = None
         if hasattr(user, "teacher_profile") and user.teacher_profile:
             class_code = user.teacher_profile.class_code
             institution_name = user.teacher_profile.institution_name
+            designation = getattr(user.teacher_profile, "designation", None)
             subject_expertise = user.teacher_profile.subject_expertise
+
+        ta_application_status = None
+        if db is not None:
+            from app.models.ta_approval_request import TAApprovalRequest
+            pending_req = db.scalar(
+                select(TAApprovalRequest).where(
+                    TAApprovalRequest.applicant_id == user.id,
+                    TAApprovalRequest.status == "PENDING",
+                )
+            )
+            if pending_req:
+                ta_application_status = "PENDING"
 
         return cls(
             username=user.username,
@@ -95,6 +120,8 @@ class UserResponse(UserBase):
             preferred_language=user.preferred_language,
             date_of_birth=user.date_of_birth,
             gender=user.gender,
+            instagram_url=getattr(user, "instagram_url", None),
+            linkedin_url=getattr(user, "linkedin_url", None),
             id=user.id,
             role_id=user.role_id,
             role_name=user.role.name,
@@ -103,7 +130,9 @@ class UserResponse(UserBase):
             phone_verified=user.phone_verified,
             class_code=class_code,
             institution_name=institution_name,
+            designation=designation,
             subject_expertise=subject_expertise,
+            ta_application_status=ta_application_status,
             created_at=user.created_at,
             updated_at=user.updated_at,
         )

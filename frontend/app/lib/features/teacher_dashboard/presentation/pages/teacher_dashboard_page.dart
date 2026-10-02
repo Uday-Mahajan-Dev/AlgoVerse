@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/network/api_client.dart';
+import '../../../../core/storage/token_storage.dart';
 import '../../domain/entities/teacher_analytics_entity.dart';
 import '../providers/teacher_analytics_provider.dart';
 import '../widgets/assign_homework_dialog.dart';
@@ -18,7 +20,42 @@ class TeacherDashboardPage extends ConsumerStatefulWidget {
 }
 
 class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   int _selectedTab = 0; // 0 = Analytics, 1 = Assignments, 2 = Students
+
+  Future<void> _respondToTARequest(String requestId, String action) async {
+    try {
+      final token = await TokenStorage.getAccessToken();
+      if (token == null || token.isEmpty) return;
+
+      final res = await ApiClient.respondToTARequest(
+        accessToken: token,
+        requestId: requestId,
+        action: action,
+      );
+
+      if (!mounted) return;
+
+      ref.invalidate(teacherTARequestsProvider);
+      ref.invalidate(teacherStudentsProvider);
+      ref.invalidate(teacherOverviewProvider);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(res['message']?.toString() ?? 'Request updated successfully.'),
+          backgroundColor: action == 'APPROVE' ? const Color(0xFF10B981) : Colors.red.shade700,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceAll('Exception: ', '').trim()),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,8 +64,10 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
     final bottlenecksAsync = ref.watch(teacherBottlenecksProvider);
     final conceptsAsync = ref.watch(teacherConceptsProvider);
     final assignmentsAsync = ref.watch(teacherAssignmentsProvider);
+    final taRequestsAsync = ref.watch(teacherTARequestsProvider);
 
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: const Color(0xFFF8FAFC),
       drawer: MediaQuery.sizeOf(context).width < 900
           ? Drawer(
@@ -54,9 +93,7 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
             child: Column(
               children: [
                 TeacherTopBar(
-                  onMenuPressed: MediaQuery.sizeOf(context).width < 900
-                      ? () => Scaffold.of(context).openDrawer()
-                      : null,
+                  onMenuPressed: () => _scaffoldKey.currentState?.openDrawer(),
                 ),
                 Expanded(
                   child: SingleChildScrollView(
@@ -70,6 +107,13 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
                             // Header & Action Bar
                             _buildHeader(context),
                             const SizedBox(height: 24),
+
+                            // TA Approval Requests (if any)
+                            taRequestsAsync.when(
+                              data: (requests) => _buildTARequestsCard(context, requests),
+                              loading: () => const SizedBox.shrink(),
+                              error: (e, s) => const SizedBox.shrink(),
+                            ),
 
                             // KPI Cards Grid
                             overviewAsync.when(
@@ -191,6 +235,163 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTARequestsCard(BuildContext context, List<dynamic> requests) {
+    final pending = requests.where((r) => r['status'] == 'PENDING').toList();
+    if (pending.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24),
+      child: Card(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: Colors.amber.shade300, width: 1.5),
+        ),
+        color: Colors.amber.shade50.withValues(alpha: 0.5),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.shade100,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(Icons.how_to_reg_rounded, color: Colors.amber.shade900),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Pending Teaching Assistant Applications (${pending.length})',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF78350F),
+                          ),
+                        ),
+                        Text(
+                          'Students requesting to join as Teaching Assistants under your supervision',
+                          style: TextStyle(fontSize: 12, color: Colors.amber.shade900),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: pending.length,
+                separatorBuilder: (ctx, i) => const SizedBox(height: 12),
+                itemBuilder: (context, index) {
+                  final req = pending[index];
+                  final reqId = req['id']?.toString() ?? '';
+                  final name = req['applicant_name']?.toString() ?? 'Applicant';
+                  final email = req['applicant_email']?.toString() ?? '';
+                  final inst = req['institution_name']?.toString() ?? '';
+                  final expertise = req['subject_expertise']?.toString() ?? '';
+                  final bio = req['bio']?.toString() ?? '';
+
+                  return Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: Colors.amber.shade200),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 18,
+                              backgroundColor: Colors.purple.shade100,
+                              child: Text(
+                                name.isNotEmpty ? name[0].toUpperCase() : 'T',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.purple.shade900,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    name,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  Text(
+                                    '$email • $inst',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (expertise.isNotEmpty || bio.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            expertise.isNotEmpty ? 'Expertise: $expertise' : bio,
+                            style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
+                          ),
+                        ],
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: () => _respondToTARequest(reqId, 'REJECT'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.red.shade700,
+                                side: BorderSide(color: Colors.red.shade300),
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              ),
+                              icon: const Icon(Icons.close_rounded, size: 16),
+                              label: const Text('Reject', style: TextStyle(fontSize: 12)),
+                            ),
+                            const SizedBox(width: 10),
+                            FilledButton.icon(
+                              onPressed: () => _respondToTARequest(reqId, 'APPROVE'),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: const Color(0xFF10B981),
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              ),
+                              icon: const Icon(Icons.check_rounded, size: 16),
+                              label: const Text('Approve TA', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

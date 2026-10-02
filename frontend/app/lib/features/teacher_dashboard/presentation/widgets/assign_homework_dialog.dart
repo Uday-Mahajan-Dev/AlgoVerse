@@ -81,14 +81,19 @@ class _AssignHomeworkDialogState extends ConsumerState<AssignHomeworkDialog> {
   Widget build(BuildContext context) {
     final studentsAsync = ref.watch(teacherStudentsProvider);
     final coursesAsync = ref.watch(coursesListProvider);
+    final isMobile = MediaQuery.sizeOf(context).width < 600;
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       backgroundColor: Colors.white,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 620, maxHeight: 720),
+        constraints: BoxConstraints(
+          maxWidth: 560,
+          maxHeight: MediaQuery.sizeOf(context).height * 0.88,
+        ),
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.all(isMobile ? 18 : 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -107,7 +112,7 @@ class _AssignHomeworkDialogState extends ConsumerState<AssignHomeworkDialog> {
                       size: 24,
                     ),
                   ),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: 12),
                   const Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -121,7 +126,7 @@ class _AssignHomeworkDialogState extends ConsumerState<AssignHomeworkDialog> {
                           ),
                         ),
                         Text(
-                          'Assign visualizer exercises or coding problems to your students',
+                          'Assign visualizer exercises or coding problems',
                           style: TextStyle(
                             fontSize: 12,
                             color: Color(0xFF64748B),
@@ -136,9 +141,9 @@ class _AssignHomeworkDialogState extends ConsumerState<AssignHomeworkDialog> {
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
               const Divider(height: 1),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
 
               if (_errorMessage != null) ...[
                 Container(
@@ -189,12 +194,38 @@ class _AssignHomeworkDialogState extends ConsumerState<AssignHomeworkDialog> {
                             return Container(
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
-                                color: Colors.grey.shade50,
-                                borderRadius: BorderRadius.circular(10),
+                                color: Colors.purple.shade50,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.purple.shade200),
                               ),
-                              child: const Text(
-                                'No students currently assigned to your classroom.',
-                                style: TextStyle(color: Colors.grey, fontSize: 13),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(Icons.people_outline_rounded,
+                                          color: Colors.purple.shade700, size: 20),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'No students enrolled yet',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.purple.shade900,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Share your Class Joining Code with your students so they can join your classroom.',
+                                    style: TextStyle(
+                                      color: Colors.purple.shade900,
+                                      fontSize: 12,
+                                      height: 1.3,
+                                    ),
+                                  ),
+                                ],
                               ),
                             );
                           }
@@ -298,6 +329,7 @@ class _AssignHomeworkDialogState extends ConsumerState<AssignHomeworkDialog> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               DropdownButtonFormField<String>(
+                                isExpanded: true,
                                 initialValue: _selectedCourseSlug,
                                 decoration: InputDecoration(
                                   labelText: 'Course',
@@ -309,7 +341,11 @@ class _AssignHomeworkDialogState extends ConsumerState<AssignHomeworkDialog> {
                                 items: courses.map((c) {
                                   return DropdownMenuItem(
                                     value: c.slug,
-                                    child: Text(c.title),
+                                    child: Text(
+                                      c.title,
+                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 1,
+                                    ),
                                   );
                                 }).toList(),
                                 onChanged: (val) {
@@ -387,18 +423,20 @@ class _AssignHomeworkDialogState extends ConsumerState<AssignHomeworkDialog> {
                                 color: Colors.indigo,
                               ),
                               const SizedBox(width: 10),
-                              Text(
-                                _selectedDueDate != null
-                                    ? 'Due: ${_selectedDueDate!.month}/${_selectedDueDate!.day}/${_selectedDueDate!.year}'
-                                    : 'Select due date (optional)',
-                                style: TextStyle(
-                                  color: _selectedDueDate != null
-                                      ? const Color(0xFF1E293B)
-                                      : Colors.grey.shade600,
-                                  fontSize: 13,
+                              Expanded(
+                                child: Text(
+                                  _selectedDueDate != null
+                                      ? 'Due: ${_selectedDueDate!.month}/${_selectedDueDate!.day}/${_selectedDueDate!.year}'
+                                      : 'Select due date (optional)',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: _selectedDueDate != null
+                                        ? const Color(0xFF1E293B)
+                                        : Colors.grey.shade600,
+                                    fontSize: 13,
+                                  ),
                                 ),
                               ),
-                              const Spacer(),
                               if (_selectedDueDate != null)
                                 IconButton(
                                   icon: const Icon(Icons.clear, size: 16),
@@ -433,41 +471,45 @@ class _AssignHomeworkDialogState extends ConsumerState<AssignHomeworkDialog> {
               const SizedBox(height: 16),
 
               // Action Buttons
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: _isSubmitting
-                        ? null
-                        : () => Navigator.of(context).pop(),
-                    child: const Text('Cancel'),
-                  ),
-                  const SizedBox(width: 10),
-                  FilledButton.icon(
-                    onPressed: _isSubmitting ? null : _submit,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.indigo,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
+              Align(
+                alignment: Alignment.centerRight,
+                child: Wrap(
+                  spacing: 10,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: _isSubmitting
+                          ? null
+                          : () => Navigator.of(context).pop(),
+                      child: const Text('Cancel'),
+                    ),
+                    FilledButton.icon(
+                      onPressed: _isSubmitting ? null : _submit,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.indigo,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
+                      ),
+                      icon: _isSubmitting
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.send_rounded, size: 16),
+                      label: Text(
+                        _isSubmitting ? 'Assigning...' : 'Assign Homework',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
-                    icon: _isSubmitting
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Icon(Icons.send_rounded, size: 16),
-                    label: Text(
-                      _isSubmitting ? 'Assigning...' : 'Assign Homework',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),
@@ -509,6 +551,7 @@ class _CourseLessonsDropdown extends ConsumerWidget {
         }
 
         return DropdownButtonFormField<String>(
+          isExpanded: true,
           initialValue: selectedLessonId,
           decoration: InputDecoration(
             labelText: 'Lesson Exercise',
@@ -547,10 +590,11 @@ class _CourseLessonsDropdown extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Flexible(
+                  Expanded(
                     child: Text(
                       l.title,
                       overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
                       style: const TextStyle(fontSize: 13),
                     ),
                   ),

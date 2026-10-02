@@ -21,6 +21,7 @@ class AppRoutes {
   static const contests = '/contests';
   static const leaderboard = '/leaderboard';
   static const profile = '/profile';
+  static const editProfile = '/profile/edit';
   static const teacher = '/teacher';
   static const teachers = '/teachers';
   static const becomeEducator = '/become-educator';

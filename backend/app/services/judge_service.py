@@ -338,7 +338,7 @@ class JudgeService:
         db.commit()
         db.refresh(submission)
 
-        # If AC -> Auto-complete lesson and award XP!
+        # If AC -> Auto-complete lesson and award badges!
         is_lesson_completed = False
         if final_verdict == "AC":
             CourseService.complete_lesson(
@@ -347,6 +347,21 @@ class JudgeService:
                 lesson_id=problem.lesson_id,
             )
             is_lesson_completed = True
+
+            from app.services.badge_service import BadgeService
+            BadgeService.award_badge_if_eligible(db, student_id, "FIRST_PROBLEM_SOLVED")
+
+            # Check if solved in 2+ distinct languages
+            distinct_langs = db.scalars(
+                select(Submission.language)
+                .where(
+                    Submission.student_id == student_id,
+                    Submission.verdict == "AC",
+                )
+                .distinct()
+            ).all()
+            if len(set(distinct_langs)) >= 2:
+                BadgeService.award_badge_if_eligible(db, student_id, "MULTILANG_CODER")
 
         message = (
             "Accepted! All test cases passed."

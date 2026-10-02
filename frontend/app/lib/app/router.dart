@@ -8,6 +8,7 @@ import '../features/courses/presentation/pages/course_catalog_page.dart';
 import '../features/courses/presentation/pages/course_detail_page.dart';
 import '../features/courses/presentation/pages/lesson_view_page.dart';
 import '../features/home/presentation/pages/home_page.dart';
+import '../features/profile/presentation/pages/edit_profile_page.dart';
 import '../features/profile/presentation/pages/profile_page.dart';
 import '../features/splash/presentation/pages/splash_page.dart';
 import '../features/student_dashboard/presentation/pages/student_dashboard_page.dart';
@@ -72,6 +73,14 @@ final appRouter = GoRouter(
     GoRoute(
       path: AppRoutes.profile,
       builder: (context, state) => const ProfilePage(),
+    ),
+
+    GoRoute(
+      path: AppRoutes.editProfile,
+      builder: (context, state) {
+        final initialData = state.extra as Map<String, dynamic>?;
+        return EditProfilePage(initialUserData: initialData);
+      },
     ),
 
     GoRoute(

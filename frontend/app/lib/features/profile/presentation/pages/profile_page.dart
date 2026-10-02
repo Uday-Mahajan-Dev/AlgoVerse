@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/network/api_client.dart';
@@ -19,14 +20,15 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _isLoggingOut = false;
   String? _errorMessage;
   Map<String, dynamic>? _userData;
+  List<dynamic> _badges = [];
 
   @override
   void initState() {
     super.initState();
-    _loadUserProfile();
+    _loadProfileAndBadges();
   }
 
-  Future<void> _loadUserProfile() async {
+  Future<void> _loadProfileAndBadges() async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -39,9 +41,17 @@ class _ProfilePageState extends State<ProfilePage> {
       }
 
       final data = await ApiClient.me(token);
+      List<dynamic> badges = [];
+      try {
+        badges = await ApiClient.getMyBadges(token);
+      } catch (_) {
+        badges = [];
+      }
+
       if (mounted) {
         setState(() {
           _userData = data;
+          _badges = badges;
           _isLoading = false;
         });
       }
@@ -51,6 +61,25 @@ class _ProfilePageState extends State<ProfilePage> {
           _errorMessage = e.toString().replaceFirst('Exception: ', '');
           _isLoading = false;
         });
+      }
+    }
+  }
+
+  Future<void> _openUrl(String url) async {
+    String formattedUrl = url.trim();
+    if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
+      formattedUrl = 'https://$formattedUrl';
+    }
+    final uri = Uri.tryParse(formattedUrl);
+    if (uri != null) {
+      try {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } catch (_) {
+        if (!mounted) return;
+        Clipboard.setData(ClipboardData(text: formattedUrl));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Link copied to clipboard: $formattedUrl')),
+        );
       }
     }
   }
@@ -102,6 +131,37 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  IconData _getBadgeIcon(String iconKey) {
+    switch (iconKey.toLowerCase()) {
+      case 'rocket':
+        return Icons.rocket_launch_rounded;
+      case 'book_open':
+        return Icons.menu_book_rounded;
+      case 'eye':
+        return Icons.visibility_rounded;
+      case 'check_circle':
+        return Icons.check_circle_rounded;
+      case 'flame':
+        return Icons.local_fire_department_rounded;
+      case 'trophy':
+        return Icons.emoji_events_rounded;
+      case 'layers':
+        return Icons.layers_rounded;
+      case 'award':
+        return Icons.military_tech_rounded;
+      case 'terminal':
+        return Icons.terminal_rounded;
+      case 'school':
+        return Icons.school_rounded;
+      case 'users':
+        return Icons.groups_rounded;
+      case 'clipboard_check':
+        return Icons.assignment_turned_in_rounded;
+      default:
+        return Icons.stars_rounded;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -110,6 +170,13 @@ class _ProfilePageState extends State<ProfilePage> {
       appBar: AppBar(
         title: const Text('My Profile'),
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Refresh Profile',
+            onPressed: _loadProfileAndBadges,
+          ),
+        ],
       ),
       body: SafeArea(
         child: _isLoading
@@ -131,7 +198,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           ),
                           const SizedBox(height: 16),
                           FilledButton.icon(
-                            onPressed: _loadUserProfile,
+                            onPressed: _loadProfileAndBadges,
                             icon: const Icon(Icons.refresh_rounded),
                             label: const Text('Retry'),
                           ),
@@ -143,20 +210,73 @@ class _ProfilePageState extends State<ProfilePage> {
                     padding: const EdgeInsets.all(20),
                     child: Center(
                       child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 600),
+                        constraints: const BoxConstraints(maxWidth: 680),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+                            // Pending TA status banner (if applicant)
+                            if (_userData?['ta_application_status'] == 'PENDING') ...[
+                              _buildPendingTABanner(),
+                              const SizedBox(height: 18),
+                            ],
+
+                            // Profile Header & Socials
                             _buildProfileHeader(theme),
                             const SizedBox(height: 24),
+
+                            // Achievements & Badges Section
+                            _buildBadgesSection(theme),
+                            const SizedBox(height: 24),
+
+                            // Educator / Class Code Section
                             _buildEducatorSection(theme),
                             const SizedBox(height: 24),
+
+                            // Logout Button
                             _buildLogoutButton(),
+                            const SizedBox(height: 16),
                           ],
                         ),
                       ),
                     ),
                   ),
+      ),
+    );
+  }
+
+  Widget _buildPendingTABanner() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.amber.shade50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.amber.shade300),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.hourglass_top_rounded, color: Colors.amber.shade900, size: 28),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'TA Application Pending Approval',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: const Color(0xFF78350F),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Your Teaching Assistant application is currently under review by your supervising professor.',
+                  style: TextStyle(fontSize: 12, color: Colors.amber.shade900),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -171,6 +291,10 @@ class _ProfilePageState extends State<ProfilePage> {
     final email = _userData?['email']?.toString() ?? '';
     final roleName = _userData?['role_name']?.toString() ?? 'STUDENT';
     final roleColor = _getRoleColor(roleName);
+    final bio = _userData?['bio']?.toString();
+    final instagramUrl = _userData?['instagram_url']?.toString();
+    final linkedinUrl = _userData?['linkedin_url']?.toString();
+    final country = _userData?['country']?.toString();
 
     return Card(
       elevation: 0,
@@ -182,17 +306,33 @@ class _ProfilePageState extends State<ProfilePage> {
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            CircleAvatar(
-              radius: 44,
-              backgroundColor: roleColor.withValues(alpha: 0.15),
-              child: Text(
-                fullName.isNotEmpty ? fullName[0].toUpperCase() : 'U',
-                style: TextStyle(
-                  fontSize: 36,
-                  fontWeight: FontWeight.bold,
-                  color: roleColor,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const SizedBox(width: 40),
+                CircleAvatar(
+                  radius: 46,
+                  backgroundColor: roleColor.withValues(alpha: 0.15),
+                  child: Text(
+                    fullName.isNotEmpty ? fullName[0].toUpperCase() : 'U',
+                    style: TextStyle(
+                      fontSize: 38,
+                      fontWeight: FontWeight.bold,
+                      color: roleColor,
+                    ),
+                  ),
                 ),
-              ),
+                IconButton.filledTonal(
+                  onPressed: () async {
+                    final res = await context.push(AppRoutes.editProfile, extra: _userData);
+                    if (res == true) {
+                      _loadProfileAndBadges();
+                    }
+                  },
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  tooltip: 'Edit Profile',
+                ),
+              ],
             ),
             const SizedBox(height: 16),
             Text(
@@ -219,6 +359,20 @@ class _ProfilePageState extends State<ProfilePage> {
                 color: Colors.grey.shade600,
               ),
             ),
+            if (country != null && country.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.location_on_outlined, size: 14, color: Colors.grey.shade600),
+                  const SizedBox(width: 4),
+                  Text(
+                    country,
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 14),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
@@ -239,7 +393,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    'CURRENT ROLE: ${roleName.toUpperCase()}',
+                    'ROLE: ${roleName.toUpperCase()}',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
@@ -250,6 +404,199 @@ class _ProfilePageState extends State<ProfilePage> {
                 ],
               ),
             ),
+            if (bio != null && bio.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Text(
+                  bio,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 13, color: Colors.grey.shade800, height: 1.4),
+                ),
+              ),
+            ],
+            if ((instagramUrl != null && instagramUrl.isNotEmpty) ||
+                (linkedinUrl != null && linkedinUrl.isNotEmpty)) ...[
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 12,
+                runSpacing: 8,
+                alignment: WrapAlignment.center,
+                children: [
+                  if (instagramUrl != null && instagramUrl.isNotEmpty)
+                    ActionChip(
+                      avatar: const Icon(Icons.camera_alt_outlined, size: 16, color: Colors.pink),
+                      label: const Text('Instagram', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      backgroundColor: Colors.pink.shade50,
+                      side: BorderSide(color: Colors.pink.shade200),
+                      onPressed: () => _openUrl(instagramUrl),
+                    ),
+                  if (linkedinUrl != null && linkedinUrl.isNotEmpty)
+                    ActionChip(
+                      avatar: const Icon(Icons.business_center_outlined, size: 16, color: Colors.blue),
+                      label: const Text('LinkedIn', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      backgroundColor: Colors.blue.shade50,
+                      side: BorderSide(color: Colors.blue.shade200),
+                      onPressed: () => _openUrl(linkedinUrl),
+                    ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBadgesSection(ThemeData theme) {
+    final earnedCount = _badges.where((b) => b['is_earned'] == true).length;
+    final totalCount = _badges.isNotEmpty ? _badges.length : 12;
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+        side: BorderSide(color: Colors.grey.shade300),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.military_tech_rounded, color: Colors.amber.shade800),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Achievement Badges',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        'Earn badges as you conquer problems, streaks, and courses',
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.shade100,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '$earnedCount / $totalCount',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.amber.shade900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            if (_badges.isEmpty)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text('Loading achievement badges...', style: TextStyle(color: Colors.grey)),
+                ),
+              )
+            else
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 220,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  mainAxisExtent: 140,
+                ),
+                itemCount: _badges.length,
+                itemBuilder: (context, i) {
+                  final badge = _badges[i];
+                  final isEarned = badge['is_earned'] == true;
+                  final title = badge['title']?.toString() ?? 'Badge';
+                  final desc = badge['description']?.toString() ?? '';
+                  final iconKey = badge['icon_key']?.toString() ?? 'star';
+                  final icon = _getBadgeIcon(iconKey);
+
+                  return Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isEarned ? Colors.amber.shade50.withValues(alpha: 0.6) : Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isEarned ? Colors.amber.shade300 : Colors.grey.shade300,
+                        width: isEarned ? 1.5 : 1,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            CircleAvatar(
+                              radius: 16,
+                              backgroundColor: isEarned ? Colors.amber.shade100 : Colors.grey.shade300,
+                              child: Icon(
+                                icon,
+                                size: 18,
+                                color: isEarned ? Colors.amber.shade900 : Colors.grey.shade600,
+                              ),
+                            ),
+                            if (isEarned)
+                              const Icon(Icons.check_circle_rounded, size: 16, color: Colors.green)
+                            else
+                              Icon(Icons.lock_outline_rounded, size: 16, color: Colors.grey.shade500),
+                          ],
+                        ),
+                        const Spacer(),
+                        Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: isEarned ? const Color(0xFF1E293B) : Colors.grey.shade600,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          desc,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isEarned ? Colors.grey.shade700 : Colors.grey.shade500,
+                            height: 1.2,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
           ],
         ),
       ),
@@ -263,6 +610,7 @@ class _ProfilePageState extends State<ProfilePage> {
     final classCode = _userData?['class_code']?.toString();
     final institutionName =
         _userData?['institution_name']?.toString() ?? 'AlgoVerse Faculty';
+    final designation = _userData?['designation']?.toString() ?? 'Educator';
     final subjectExpertise = _userData?['subject_expertise']?.toString() ??
         'Data Structures & Algorithms';
 
@@ -290,16 +638,16 @@ class _ProfilePageState extends State<ProfilePage> {
                         color: Colors.purple),
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Verified Educator Account',
-                          style: TextStyle(
+                          'Verified $designation',
+                          style: const TextStyle(
                               fontSize: 16, fontWeight: FontWeight.bold),
                         ),
-                        Text(
+                        const Text(
                           'Manage your classroom, track bottlenecks, and assign homework',
                           style: TextStyle(fontSize: 12, color: Colors.grey),
                         ),
@@ -365,7 +713,6 @@ class _ProfilePageState extends State<ProfilePage> {
                   'Institution: $institutionName • Focus: $subjectExpertise',
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                 ),
-                const SizedBox(height: 4),
               ],
             ],
           ),
@@ -424,7 +771,10 @@ class _ProfilePageState extends State<ProfilePage> {
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: () => context.push(AppRoutes.becomeEducator),
+                onPressed: () async {
+                  await context.push(AppRoutes.becomeEducator);
+                  _loadProfileAndBadges();
+                },
                 style: FilledButton.styleFrom(
                   backgroundColor: Colors.indigo,
                   padding: const EdgeInsets.symmetric(vertical: 14),

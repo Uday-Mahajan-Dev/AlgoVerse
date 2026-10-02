@@ -259,6 +259,9 @@ class CourseService:
         db.commit()
         db.refresh(new_enrollment)
 
+        from app.services.badge_service import BadgeService
+        BadgeService.award_badge_if_eligible(db, student_id, "FIRST_ENROLLMENT")
+
         return EnrollmentResponse(
             course_id=course.id,
             enrolled_at=new_enrollment.enrolled_at,
@@ -507,6 +510,39 @@ class CourseService:
 
         db.commit()
         db.refresh(completion)
+
+        from app.services.badge_service import BadgeService
+
+        if lesson.content_type == "VISUALIZATION":
+            BadgeService.award_badge_if_eligible(db, student_id, "FIRST_VISUALIZATION")
+
+        if matching_assignments:
+            BadgeService.award_badge_if_eligible(db, student_id, "HOMEWORK_COMPLETE")
+
+        # Check module / course completion
+        if lesson.module:
+            mod_lesson_ids = [l.id for l in lesson.module.lessons]
+            mod_completed_count = db.scalar(
+                select(func.count(LessonCompletion.id)).where(
+                    LessonCompletion.student_id == student_id,
+                    LessonCompletion.lesson_id.in_(mod_lesson_ids),
+                )
+            ) or 0
+            if mod_completed_count >= len(mod_lesson_ids) and len(mod_lesson_ids) > 0:
+                BadgeService.award_badge_if_eligible(db, student_id, "ARRAYS_MODULE_COMPLETE")
+
+            if lesson.module.course:
+                all_course_lesson_ids = []
+                for m in lesson.module.course.modules:
+                    all_course_lesson_ids.extend([l.id for l in m.lessons])
+                course_completed_count = db.scalar(
+                    select(func.count(LessonCompletion.id)).where(
+                        LessonCompletion.student_id == student_id,
+                        LessonCompletion.lesson_id.in_(all_course_lesson_ids),
+                    )
+                ) or 0
+                if course_completed_count >= len(all_course_lesson_ids) and len(all_course_lesson_ids) > 0:
+                    BadgeService.award_badge_if_eligible(db, student_id, "ARRAYS_COURSE_COMPLETE")
 
         return LessonCompletionResponse(
             lesson_id=lesson.id,

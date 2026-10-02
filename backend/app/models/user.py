@@ -70,6 +70,16 @@ class User(BaseModel):
         Date,
     )
 
+    instagram_url: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+
+    linkedin_url: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+
     gender: Mapped[str | None] = mapped_column(
         String(20),
     )
@@ -128,8 +138,16 @@ class User(BaseModel):
 
     teacher_profile = relationship(
         "TeacherProfile",
+        foreign_keys="[TeacherProfile.user_id]",
         back_populates="user",
         uselist=False,
         cascade="all, delete-orphan",
+    )
+
+    user_badges = relationship(
+        "UserBadge",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 

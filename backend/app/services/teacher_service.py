@@ -1,6 +1,6 @@
 import random
 import string
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -10,16 +10,20 @@ from sqlalchemy.orm import Session
 from app.core.enums import UserRole
 from app.models.role import Role
 from app.models.student_teacher import StudentTeacher
+from app.models.ta_approval_request import TAApprovalRequest
 from app.models.teacher_profile import TeacherProfile
 from app.models.user import User
 from app.schemas.teachers import (
     EducatorRegistrationResponse,
     JoinClassResponse,
     MyTeacherResponse,
+    TARequestResponse,
+    TAResponseActionResult,
     TeacherListItem,
     TeacherProfileResponse,
     TeacherSelectionResponse,
 )
+from app.services.badge_service import BadgeService
 
 
 class TeacherService:
@@ -124,6 +128,7 @@ class TeacherService:
                     student_count=int(count),
                     specialty=specialty,
                     institution_name=profile.institution_name if profile else None,
+                    designation=profile.designation if profile else None,
                     class_code=profile.class_code if profile else None,
                 )
             )
@@ -181,6 +186,7 @@ class TeacherService:
             student_count=student_count,
             specialty=specialty,
             institution_name=profile.institution_name if profile else None,
+            designation=profile.designation if profile else None,
             class_code=profile.class_code if profile else None,
             created_at=teacher.created_at,
         )
@@ -190,7 +196,10 @@ class TeacherService:
         db: Session,
         user_id: UUID,
         institution_name: str,
+        designation: str,
         subject_expertise: str,
+        date_of_birth: date,
+        supervisor_email: str | None = None,
         bio: str | None = None,
     ) -> EducatorRegistrationResponse:
         user = db.scalar(select(User).where(User.id == user_id, User.is_active.is_(True)))
@@ -209,13 +218,113 @@ class TeacherService:
                 detail="Teacher role not configured in database.",
             )
 
-        # Update user role to TEACHER
+        # Server-side age calculation
+        today = date.today()
+        age = today.year - date_of_birth.year - (
+            (today.month, today.day) < (date_of_birth.month, date_of_birth.day)
+        )
+
+        clean_desig = designation.strip()
+        is_ta = clean_desig.lower() == "teaching assistant"
+
+        # Age gate validation
+        if age < 25 and not is_ta:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Educators under 25 years old must register through the Teaching Assistant (TA) pathway with supervisor professor approval.",
+            )
+
+        # Update user DOB and Bio
+        user.date_of_birth = date_of_birth
+        if bio:
+            user.bio = bio.strip()
+
+        # TA Approval Pathway
+        if age < 25 or is_ta:
+            if not supervisor_email or not supervisor_email.strip():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="A valid supervising professor's email is required for Teaching Assistant applications or educators under 25.",
+                )
+
+            sup_email = supervisor_email.strip().lower()
+            supervisor = db.scalar(
+                select(User).where(
+                    func.lower(User.email) == sup_email,
+                    User.is_active.is_(True),
+                )
+            )
+            if not supervisor:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"No educator account found with email '{supervisor_email}'. Please verify your professor's email.",
+                )
+
+            if supervisor.id == user.id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="You cannot specify yourself as your supervising professor.",
+                )
+
+            if supervisor.role_id != teacher_role.id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"The user with email '{supervisor_email}' does not have an active Educator role.",
+                )
+
+            # Create or update pending TA approval request
+            existing_req = db.scalar(
+                select(TAApprovalRequest).where(
+                    TAApprovalRequest.applicant_id == user.id,
+                    TAApprovalRequest.status == "PENDING",
+                )
+            )
+            if existing_req:
+                existing_req.supervisor_id = supervisor.id
+                existing_req.institution_name = institution_name.strip()
+                existing_req.designation = "Teaching Assistant"
+                existing_req.subject_expertise = subject_expertise.strip()
+                existing_req.bio = bio.strip() if bio else None
+                existing_req.date_of_birth = date_of_birth
+            else:
+                new_req = TAApprovalRequest(
+                    applicant_id=user.id,
+                    supervisor_id=supervisor.id,
+                    status="PENDING",
+                    institution_name=institution_name.strip(),
+                    designation="Teaching Assistant",
+                    subject_expertise=subject_expertise.strip(),
+                    bio=bio.strip() if bio else None,
+                    date_of_birth=date_of_birth,
+                )
+                db.add(new_req)
+
+            try:
+                db.commit()
+                db.refresh(user)
+            except Exception:
+                db.rollback()
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to submit Teaching Assistant application.",
+                )
+
+            sup_name = f"{supervisor.first_name} {supervisor.last_name}".strip() or supervisor.username
+            return EducatorRegistrationResponse(
+                status="PENDING_SUPERVISOR_APPROVAL",
+                message=f"Application submitted! Your request has been routed to Professor {sup_name} ({supervisor.email}) for review.",
+                role=user.role.name if user.role else UserRole.STUDENT.value,
+                class_code=None,
+                institution_name=institution_name.strip(),
+                designation="Teaching Assistant",
+                subject_expertise=subject_expertise.strip(),
+                bio=bio,
+            )
+
+        # Full Educator Instant Approval Pathway (Age >= 25 and non-TA designation)
         user.role_id = teacher_role.id
         user.role = teacher_role
-        if bio:
-            user.bio = bio
 
-        # Check existing teacher profile or create new
         profile = db.scalar(
             select(TeacherProfile).where(TeacherProfile.user_id == user.id)
         )
@@ -225,19 +334,24 @@ class TeacherService:
             profile = TeacherProfile(
                 user_id=user.id,
                 institution_name=institution_name.strip(),
+                designation=clean_desig,
                 subject_expertise=subject_expertise.strip(),
                 bio=bio.strip() if bio else None,
+                date_of_birth=date_of_birth,
                 class_code=class_code,
                 is_verified=True,
             )
             db.add(profile)
         else:
             profile.institution_name = institution_name.strip()
+            profile.designation = clean_desig
             profile.subject_expertise = subject_expertise.strip()
+            profile.date_of_birth = date_of_birth
             if bio:
                 profile.bio = bio.strip()
             if not profile.class_code:
                 profile.class_code = TeacherService._generate_unique_class_code(db, institution_name)
+            profile.is_verified = True
 
         try:
             db.commit()
@@ -250,13 +364,154 @@ class TeacherService:
                 detail="Failed to register as educator. Please try again.",
             )
 
+        # Award EDUCATOR badge
+        BadgeService.award_badge_if_eligible(db, user.id, "EDUCATOR")
+
         return EducatorRegistrationResponse(
-            message="Successfully registered as educator.",
+            status="APPROVED",
+            message="Successfully verified and registered as educator.",
             role=UserRole.TEACHER.value,
             class_code=profile.class_code,
             institution_name=profile.institution_name,
+            designation=profile.designation,
             subject_expertise=profile.subject_expertise,
             bio=profile.bio,
+        )
+
+    @staticmethod
+    def get_ta_requests(
+        db: Session,
+        teacher_id: UUID,
+    ) -> list[TARequestResponse]:
+        requests = db.scalars(
+            select(TAApprovalRequest)
+            .where(TAApprovalRequest.supervisor_id == teacher_id)
+            .order_by(TAApprovalRequest.requested_at.desc())
+        ).all()
+
+        results = []
+        for r in requests:
+            applicant = r.applicant
+            app_name = f"{applicant.first_name} {applicant.last_name}".strip() if applicant else "Applicant"
+            if not app_name and applicant:
+                app_name = applicant.username
+
+            results.append(
+                TARequestResponse(
+                    id=r.id,
+                    applicant_id=r.applicant_id,
+                    applicant_name=app_name,
+                    applicant_email=applicant.email if applicant else "",
+                    applicant_username=applicant.username if applicant else "",
+                    applicant_avatar_url=applicant.avatar_url if applicant else None,
+                    institution_name=r.institution_name,
+                    designation=r.designation,
+                    subject_expertise=r.subject_expertise,
+                    bio=r.bio,
+                    date_of_birth=r.date_of_birth,
+                    status=r.status,
+                    requested_at=r.requested_at,
+                    responded_at=r.responded_at,
+                )
+            )
+        return results
+
+    @staticmethod
+    def respond_to_ta_request(
+        db: Session,
+        teacher_id: UUID,
+        request_id: UUID,
+        action: str,
+    ) -> TAResponseActionResult:
+        req = db.scalar(
+            select(TAApprovalRequest).where(
+                TAApprovalRequest.id == request_id,
+                TAApprovalRequest.supervisor_id == teacher_id,
+            )
+        )
+        if not req:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="TA approval request not found or not assigned to you.",
+            )
+
+        if req.status != "PENDING":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"This request has already been resolved with status '{req.status}'.",
+            )
+
+        act = action.strip().upper()
+        if act not in ["APPROVE", "REJECT"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Action must be either APPROVE or REJECT.",
+            )
+
+        req.responded_at = datetime.now(timezone.utc)
+
+        if act == "APPROVE":
+            req.status = "APPROVED"
+            teacher_role = db.scalar(select(Role).where(Role.name == UserRole.TEACHER.value))
+            if not teacher_role:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Teacher role not configured.",
+                )
+
+            applicant = db.scalar(select(User).where(User.id == req.applicant_id))
+            if applicant:
+                applicant.role_id = teacher_role.id
+                applicant.role = teacher_role
+
+                # Create or update applicant teacher profile
+                profile = db.scalar(
+                    select(TeacherProfile).where(TeacherProfile.user_id == applicant.id)
+                )
+                if not profile:
+                    class_code = TeacherService._generate_unique_class_code(db, req.institution_name)
+                    profile = TeacherProfile(
+                        user_id=applicant.id,
+                        institution_name=req.institution_name,
+                        designation=req.designation,
+                        subject_expertise=req.subject_expertise,
+                        bio=req.bio,
+                        date_of_birth=req.date_of_birth,
+                        class_code=class_code,
+                        supervisor_id=teacher_id,
+                        is_verified=True,
+                    )
+                    db.add(profile)
+                else:
+                    profile.institution_name = req.institution_name
+                    profile.designation = req.designation
+                    profile.subject_expertise = req.subject_expertise
+                    profile.bio = req.bio
+                    profile.date_of_birth = req.date_of_birth
+                    profile.supervisor_id = teacher_id
+                    profile.is_verified = True
+                    if not profile.class_code:
+                        profile.class_code = TeacherService._generate_unique_class_code(db, req.institution_name)
+
+                BadgeService.award_badge_if_eligible(db, applicant.id, "EDUCATOR")
+        else:
+            req.status = "REJECTED"
+
+        try:
+            db.commit()
+            db.refresh(req)
+        except Exception:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to update TA request.",
+            )
+
+        return TAResponseActionResult(
+            message=f"TA application has been {req.status.lower()} successfully.",
+            request_id=req.id,
+            status=req.status,
+            applicant_id=req.applicant_id,
         )
 
     @staticmethod
@@ -310,6 +565,9 @@ class TeacherService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to join class. Please try again.",
             )
+
+        # Award MENTOR_LINKED badge
+        BadgeService.award_badge_if_eligible(db, student_id, "MENTOR_LINKED")
 
         teacher_name = (
             f"{teacher.first_name} {teacher.last_name}".strip()
@@ -375,6 +633,9 @@ class TeacherService:
                 detail="Failed to update teacher selection. Please try again.",
             )
 
+        # Award MENTOR_LINKED badge
+        BadgeService.award_badge_if_eligible(db, student_id, "MENTOR_LINKED")
+
         teacher_name = (
             f"{teacher.first_name} {teacher.last_name}".strip()
             or teacher.username
@@ -415,4 +676,3 @@ class TeacherService:
             teacher=teacher_profile,
             selected_at=association.created_at,
         )
-

@@ -64,3 +64,15 @@ final studentAssignmentsProvider =
   final repo = ref.watch(teacherAnalyticsRepositoryProvider);
   return repo.getStudentAssignments();
 });
+
+final teacherTARequestsProvider =
+    FutureProvider<List<dynamic>>((ref) async {
+  final token = await TokenStorage.getAccessToken();
+  if (token == null || token.isEmpty) return [];
+  try {
+    return await ApiClient.getTARequests(accessToken: token);
+  } catch (_) {
+    return [];
+  }
+});
+

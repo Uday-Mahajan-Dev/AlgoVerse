@@ -230,6 +230,71 @@ class ApiClient {
     return _handleResponse(response);
   }
 
+  static Future<Map<String, dynamic>> updateProfile({
+    required String accessToken,
+    String? firstName,
+    String? lastName,
+    String? username,
+    String? bio,
+    String? avatarUrl,
+    String? country,
+    String? dateOfBirth,
+    String? instagramUrl,
+    String? linkedinUrl,
+  }) async {
+    final response = await http
+        .patch(
+          Uri.parse('$baseUrl/users/me'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: jsonEncode({
+            'first_name': ?firstName,
+            'last_name': ?lastName,
+            'username': ?username,
+            'bio': ?bio,
+            'avatar_url': ?avatarUrl,
+            'country': ?country,
+            'date_of_birth': ?dateOfBirth,
+            'instagram_url': ?instagramUrl,
+            'linkedin_url': ?linkedinUrl,
+          }),
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<List<dynamic>> getMyBadges(String accessToken) async {
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/users/me/badges'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleListResponse(response);
+  }
+
+  static Future<List<dynamic>> getAllBadges(String accessToken) async {
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/badges'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleListResponse(response);
+  }
+
   static Future<Map<String, dynamic>> updateMyRole(
     String role, {
     String? accessToken,
@@ -423,7 +488,10 @@ class ApiClient {
   static Future<Map<String, dynamic>> registerEducator({
     required String accessToken,
     required String institutionName,
+    required String designation,
     required String subjectExpertise,
+    required String dateOfBirth,
+    String? supervisorEmail,
     String? bio,
   }) async {
     final response = await http
@@ -436,9 +504,49 @@ class ApiClient {
           },
           body: jsonEncode({
             'institution_name': institutionName,
+            'designation': designation,
             'subject_expertise': subjectExpertise,
-            if (bio != null && bio.isNotEmpty) 'bio': bio,
+            'date_of_birth': dateOfBirth,
+            if (supervisorEmail != null && supervisorEmail.isNotEmpty)
+              'supervisor_email': supervisorEmail,
+            if (bio != null && bio.isNotEmpty) 'professional_bio': bio,
           }),
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<List<dynamic>> getTARequests({
+    required String accessToken,
+  }) async {
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/teachers/ta-requests'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleListResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> respondToTARequest({
+    required String accessToken,
+    required String requestId,
+    required String action, // APPROVE | REJECT
+  }) async {
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/teachers/ta-requests/$requestId/respond'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: jsonEncode({'action': action}),
         )
         .timeout(AppConstants.requestTimeout);
 
