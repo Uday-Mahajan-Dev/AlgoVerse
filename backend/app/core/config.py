@@ -80,7 +80,7 @@ class Settings(BaseSettings):
 
     AI_PROVIDER: str = "gemini"  # "gemini", "openai", "disabled"
     AI_API_KEY: str = ""
-    AI_MODEL: str = "gemini-2.0-flash"
+    AI_MODEL: str = "gemini-1.5-flash"
     AI_MAX_HINTS_PER_LESSON: int = 10
     AI_RATE_LIMIT_PER_MINUTE: int = 3
 

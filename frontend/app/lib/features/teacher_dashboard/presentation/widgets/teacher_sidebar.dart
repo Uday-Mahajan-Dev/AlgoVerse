@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_routes.dart';
-import '../../../../core/network/api_client.dart';
-import '../../../../core/storage/token_storage.dart';
-import '../../../auth/data/social_auth_service.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 
-class TeacherSidebar extends StatelessWidget {
+class TeacherSidebar extends ConsumerWidget {
   final int selectedIndex;
   final ValueChanged<int> onItemSelected;
 
@@ -16,20 +15,10 @@ class TeacherSidebar extends StatelessWidget {
     required this.onItemSelected,
   });
 
-  Future<void> _logout(BuildContext context) async {
+  Future<void> _logout(BuildContext context, WidgetRef ref) async {
     try {
-      final refreshToken = await TokenStorage.getRefreshToken();
-      if (refreshToken != null && refreshToken.isNotEmpty) {
-        try {
-          await ApiClient.logout(refreshToken);
-        } catch (_) {}
-      }
-      try {
-        await SocialAuthService.signOut();
-      } catch (_) {}
-      await TokenStorage.clear();
+      await ref.read(authNotifierProvider.notifier).logout(context: context);
       if (!context.mounted) return;
-      context.go(AppRoutes.login);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Logged out successfully')),
       );
@@ -44,8 +33,9 @@ class TeacherSidebar extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+
 
     return Container(
       width: 260,
@@ -87,14 +77,9 @@ class TeacherSidebar extends StatelessWidget {
                   _SidebarItem(
                     icon: Icons.edit_note_rounded,
                     title: 'Educator Studio (Quizzes & Problems)',
-                    selected: false,
+                    selected: selectedIndex == 1,
                     onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Educator Studio coming soon!'),
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
+                      context.push(AppRoutes.educatorStudio);
                     },
                   ),
                   _SidebarItem(
@@ -114,7 +99,7 @@ class TeacherSidebar extends StatelessWidget {
                 selected: false,
                 iconColor: Colors.red.shade700,
                 textColor: Colors.red.shade700,
-                onTap: () => _logout(context),
+                onTap: () => _logout(context, ref),
               ),
             ),
           ],

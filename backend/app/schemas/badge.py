@@ -11,6 +11,7 @@ class BadgeResponse(BaseModel):
     description: str
     icon_key: str
     category: str
+    target_role: str = "ALL"
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -22,6 +23,7 @@ class UserBadgeResponse(BaseModel):
     description: str
     icon_key: str
     category: str
+    target_role: str = "ALL"
     is_earned: bool = False
     earned_at: datetime | None = None
 

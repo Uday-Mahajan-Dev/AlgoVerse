@@ -9,9 +9,15 @@ class TeacherModel extends TeacherEntity {
     super.email,
     super.avatarUrl,
     super.bio,
+    super.professionalBio,
     super.country,
     required super.studentCount,
     required super.specialty,
+    super.institutionName,
+    super.designation,
+    super.classCode,
+    super.instagramUrl,
+    super.linkedinUrl,
     super.createdAt,
   });
 
@@ -31,10 +37,16 @@ class TeacherModel extends TeacherEntity {
       email: json['email'] as String?,
       avatarUrl: json['avatar_url'] as String?,
       bio: json['bio'] as String?,
+      professionalBio: (json['professional_bio'] ?? json['bio']) as String?,
       country: json['country'] as String?,
       studentCount: json['student_count'] as int? ?? 0,
       specialty: json['specialty'] as String? ??
           'Data Structures & Competitive Programming',
+      institutionName: json['institution_name'] as String?,
+      designation: json['designation'] as String?,
+      classCode: json['class_code'] as String?,
+      instagramUrl: json['instagram_url'] as String?,
+      linkedinUrl: json['linkedin_url'] as String?,
       createdAt: parsedCreatedAt,
     );
   }

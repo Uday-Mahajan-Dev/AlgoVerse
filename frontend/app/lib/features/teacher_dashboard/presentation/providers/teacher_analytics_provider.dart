@@ -76,3 +76,26 @@ final teacherTARequestsProvider =
   }
 });
 
+final teacherCreatedProblemsProvider =
+    FutureProvider<List<dynamic>>((ref) async {
+  final token = await TokenStorage.getAccessToken();
+  if (token == null || token.isEmpty) return [];
+  try {
+    return await ApiClient.getTeacherCustomProblems(accessToken: token);
+  } catch (_) {
+    return [];
+  }
+});
+
+final teacherCreatedQuizzesProvider =
+    FutureProvider<List<dynamic>>((ref) async {
+  final token = await TokenStorage.getAccessToken();
+  if (token == null || token.isEmpty) return [];
+  try {
+    return await ApiClient.getTeacherQuizzes(accessToken: token);
+  } catch (_) {
+    return [];
+  }
+});
+
+

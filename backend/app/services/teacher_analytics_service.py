@@ -9,9 +9,11 @@ from app.models.assignment import Assignment
 from app.models.course import Course
 from app.models.course_enrollment import CourseEnrollment
 from app.models.course_module import CourseModule
+from app.models.custom_problem import CustomProblem
 from app.models.lesson import Lesson
 from app.models.lesson_completion import LessonCompletion
 from app.models.problem import Problem
+from app.models.quiz import Quiz
 from app.models.student_lesson_activity import StudentLessonActivity
 from app.models.student_teacher import StudentTeacher
 from app.models.submission import Submission
@@ -24,6 +26,9 @@ from app.schemas.teacher_analytics import (
     StudentProgressResponse,
     TeacherOverviewResponse,
 )
+from app.services.badge_service import BadgeService
+from app.services.notification_service import NotificationService
+
 
 
 class TeacherAnalyticsService:
@@ -624,14 +629,17 @@ class TeacherAnalyticsService:
         return matrix
 
     @classmethod
+    @classmethod
     def create_assignments(
         cls,
         db: Session,
         teacher_id: UUID,
         student_ids: list[UUID],
-        lesson_id: UUID,
-        due_date: datetime | None,
-        notes: str | None,
+        lesson_id: UUID | None = None,
+        custom_problem_id: UUID | None = None,
+        quiz_id: UUID | None = None,
+        due_date: datetime | None = None,
+        notes: str | None = None,
     ) -> list[AssignmentResponse]:
         """Create homework assignment(s) for students assigned to this teacher."""
         teacher = db.execute(select(User).where(User.id == teacher_id)).scalars().first()
@@ -641,23 +649,64 @@ class TeacherAnalyticsService:
                 detail="Teacher not found.",
             )
 
-        lesson = (
-            db.execute(
-                select(Lesson)
-                .where(Lesson.id == lesson_id)
-                .options(selectinload(Lesson.module).selectinload(CourseModule.course))
-            )
-            .scalars()
-            .first()
-        )
-        if not lesson:
+        if not lesson_id and not custom_problem_id and not quiz_id:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Lesson not found.",
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Must provide at least one of lesson_id, custom_problem_id, or quiz_id.",
             )
 
-        course_title = lesson.module.course.title if lesson.module and lesson.module.course else "DSA Course"
-        course_slug = lesson.module.course.slug if lesson.module and lesson.module.course else "arrays"
+        assignment_type = "LESSON"
+        title = ""
+        course_title = ""
+        course_slug = ""
+        lesson_slug = None
+        lesson_title = None
+
+        if lesson_id:
+            lesson = (
+                db.execute(
+                    select(Lesson)
+                    .where(Lesson.id == lesson_id)
+                    .options(selectinload(Lesson.module).selectinload(CourseModule.course))
+                )
+                .scalars()
+                .first()
+            )
+            if not lesson:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Lesson not found.",
+                )
+            assignment_type = "LESSON"
+            lesson_slug = lesson.slug
+            lesson_title = lesson.title
+            title = lesson.title
+            course_title = lesson.module.course.title if lesson.module and lesson.module.course else "DSA Course"
+            course_slug = lesson.module.course.slug if lesson.module and lesson.module.course else "arrays"
+
+        elif custom_problem_id:
+            custom_problem = db.scalar(select(CustomProblem).where(CustomProblem.id == custom_problem_id))
+            if not custom_problem:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Custom problem not found.",
+                )
+            assignment_type = "CUSTOM_PROBLEM"
+            title = custom_problem.title
+            course_title = "Educator Studio"
+            course_slug = "custom-problems"
+
+        elif quiz_id:
+            quiz = db.scalar(select(Quiz).where(Quiz.id == quiz_id))
+            if not quiz:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Quiz not found.",
+                )
+            assignment_type = "QUIZ"
+            title = quiz.title
+            course_title = "Live Quiz"
+            course_slug = "quizzes"
 
         # Verify students belong to this teacher
         teacher_student_ids = {s.id for s in cls._get_teacher_students(db, teacher_id)}
@@ -680,16 +729,18 @@ class TeacherAnalyticsService:
             if not student:
                 continue
 
-            # Check if student already completed this lesson
-            already_completed = (
-                db.scalar(
-                    select(func.count(LessonCompletion.id)).where(
-                        LessonCompletion.student_id == sid,
-                        LessonCompletion.lesson_id == lesson_id,
+            # Check if student already completed this lesson if LESSON type
+            already_completed = False
+            if lesson_id:
+                already_completed = (
+                    db.scalar(
+                        select(func.count(LessonCompletion.id)).where(
+                            LessonCompletion.student_id == sid,
+                            LessonCompletion.lesson_id == lesson_id,
+                        )
                     )
-                )
-                or 0
-            ) > 0
+                    or 0
+                ) > 0
 
             initial_status = "completed" if already_completed else "pending"
             completed_time = datetime.now(timezone.utc) if already_completed else None
@@ -698,6 +749,8 @@ class TeacherAnalyticsService:
                 teacher_id=teacher_id,
                 student_id=sid,
                 lesson_id=lesson_id,
+                custom_problem_id=custom_problem_id,
+                quiz_id=quiz_id,
                 assigned_at=datetime.now(timezone.utc),
                 due_date=due_date,
                 status=initial_status,
@@ -708,10 +761,23 @@ class TeacherAnalyticsService:
             db.commit()
             db.refresh(assignment)
 
+            # Send dynamic notification to student
+            try:
+                NotificationService.create_notification(
+                    db=db,
+                    user_id=sid,
+                    title="New Homework Assigned",
+                    message=f"Solve: {title}",
+                    type="HOMEWORK",
+                )
+            except Exception as e:
+                pass
+
             student_name = (
                 f"{student.first_name or ''} {student.last_name or ''}".strip()
                 or student.username
             )
+
 
             created_responses.append(
                 AssignmentResponse(
@@ -720,11 +786,15 @@ class TeacherAnalyticsService:
                     teacher_name=teacher_name,
                     student_id=sid,
                     student_name=student_name,
+                    assignment_type=assignment_type,
                     lesson_id=lesson_id,
-                    lesson_slug=lesson.slug,
-                    lesson_title=lesson.title,
+                    lesson_slug=lesson_slug,
+                    lesson_title=lesson_title,
                     course_title=course_title,
                     course_slug=course_slug,
+                    custom_problem_id=custom_problem_id,
+                    quiz_id=quiz_id,
+                    title=title,
                     assigned_at=assignment.assigned_at,
                     due_date=assignment.due_date,
                     status=assignment.status,
@@ -732,6 +802,12 @@ class TeacherAnalyticsService:
                     completed_at=assignment.completed_at,
                 )
             )
+
+        # Award HOMEWORK_ASSIGNED badge to teacher
+        try:
+            BadgeService.award_badge_if_eligible(db, teacher_id, "HOMEWORK_ASSIGNED")
+        except Exception as e:
+            pass
 
         return created_responses
 
@@ -752,6 +828,8 @@ class TeacherAnalyticsService:
                     selectinload(Assignment.lesson)
                     .selectinload(Lesson.module)
                     .selectinload(CourseModule.course),
+                    selectinload(Assignment.custom_problem),
+                    selectinload(Assignment.quiz),
                 )
                 .order_by(desc(Assignment.assigned_at))
             )
@@ -782,8 +860,10 @@ class TeacherAnalyticsService:
                 if a.student
                 else "Student"
             )
-            l_slug = a.lesson.slug if a.lesson else ""
-            l_title = a.lesson.title if a.lesson else ""
+
+            assignment_type = "LESSON"
+            l_slug = a.lesson.slug if a.lesson else None
+            l_title = a.lesson.title if a.lesson else None
             c_title = (
                 a.lesson.module.course.title
                 if a.lesson and a.lesson.module and a.lesson.module.course
@@ -794,6 +874,18 @@ class TeacherAnalyticsService:
                 if a.lesson and a.lesson.module and a.lesson.module.course
                 else "arrays"
             )
+            title = l_title or ""
+
+            if a.custom_problem_id and a.custom_problem:
+                assignment_type = "CUSTOM_PROBLEM"
+                title = a.custom_problem.title
+                c_title = "Educator Studio"
+                c_slug = "custom-problems"
+            elif a.quiz_id and a.quiz:
+                assignment_type = "QUIZ"
+                title = a.quiz.title
+                c_title = "Live Quiz"
+                c_slug = "quizzes"
 
             result.append(
                 AssignmentResponse(
@@ -802,11 +894,15 @@ class TeacherAnalyticsService:
                     teacher_name=t_name,
                     student_id=a.student_id,
                     student_name=s_name,
+                    assignment_type=assignment_type,
                     lesson_id=a.lesson_id,
                     lesson_slug=l_slug,
                     lesson_title=l_title,
                     course_title=c_title,
                     course_slug=c_slug,
+                    custom_problem_id=a.custom_problem_id,
+                    quiz_id=a.quiz_id,
+                    title=title,
                     assigned_at=a.assigned_at,
                     due_date=a.due_date,
                     status=curr_status,
@@ -834,6 +930,8 @@ class TeacherAnalyticsService:
                     selectinload(Assignment.lesson)
                     .selectinload(Lesson.module)
                     .selectinload(CourseModule.course),
+                    selectinload(Assignment.custom_problem),
+                    selectinload(Assignment.quiz),
                 )
                 .order_by(desc(Assignment.assigned_at))
             )
@@ -863,8 +961,10 @@ class TeacherAnalyticsService:
                 if a.student
                 else "Student"
             )
-            l_slug = a.lesson.slug if a.lesson else ""
-            l_title = a.lesson.title if a.lesson else ""
+
+            assignment_type = "LESSON"
+            l_slug = a.lesson.slug if a.lesson else None
+            l_title = a.lesson.title if a.lesson else None
             c_title = (
                 a.lesson.module.course.title
                 if a.lesson and a.lesson.module and a.lesson.module.course
@@ -875,6 +975,18 @@ class TeacherAnalyticsService:
                 if a.lesson and a.lesson.module and a.lesson.module.course
                 else "arrays"
             )
+            title = l_title or ""
+
+            if a.custom_problem_id and a.custom_problem:
+                assignment_type = "CUSTOM_PROBLEM"
+                title = a.custom_problem.title
+                c_title = "Educator Studio"
+                c_slug = "custom-problems"
+            elif a.quiz_id and a.quiz:
+                assignment_type = "QUIZ"
+                title = a.quiz.title
+                c_title = "Live Quiz"
+                c_slug = "quizzes"
 
             result.append(
                 AssignmentResponse(
@@ -883,11 +995,15 @@ class TeacherAnalyticsService:
                     teacher_name=t_name,
                     student_id=a.student_id,
                     student_name=s_name,
+                    assignment_type=assignment_type,
                     lesson_id=a.lesson_id,
                     lesson_slug=l_slug,
                     lesson_title=l_title,
                     course_title=c_title,
                     course_slug=c_slug,
+                    custom_problem_id=a.custom_problem_id,
+                    quiz_id=a.quiz_id,
+                    title=title,
                     assigned_at=a.assigned_at,
                     due_date=a.due_date,
                     status=curr_status,

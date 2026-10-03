@@ -34,6 +34,13 @@ class Badge(BaseModel):
         nullable=False,
     )
 
+    target_role: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="ALL",
+        server_default="ALL",
+    )  # "STUDENT", "TEACHER", or "ALL"
+
     user_badges = relationship(
         "UserBadge",
         back_populates="badge",

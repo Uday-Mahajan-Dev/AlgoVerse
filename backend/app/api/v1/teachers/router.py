@@ -213,6 +213,107 @@ def get_concept_performance_matrix(
     )
 
 
+from app.schemas.custom_problem import (
+    CustomProblemCreate,
+    CustomProblemResponse,
+    CustomProblemStatsResponse,
+    GenerateTemplatesRequest,
+    GenerateTemplatesResponse,
+)
+from app.services.custom_problem_service import CustomProblemService
+
+
+# ============================================================
+# EDUCATOR STUDIO - CUSTOM CODING PROBLEMS (TEACHER ROLE)
+# ============================================================
+
+@router.post(
+    "/custom-problems/generate-templates",
+    response_model=GenerateTemplatesResponse,
+    summary="Auto-generate Python, Java, and C++ starter templates from single teacher code",
+)
+def generate_starter_templates(
+    request: GenerateTemplatesRequest,
+    current_teacher: User = Depends(get_current_teacher),
+):
+    templates = CustomProblemService.auto_generate_starter_codes(
+        code=request.code,
+        source_lang=request.language,
+    )
+    return GenerateTemplatesResponse(
+        starter_code_python=templates["starter_code_python"],
+        starter_code_java=templates["starter_code_java"],
+        starter_code_cpp=templates["starter_code_cpp"],
+    )
+
+
+@router.post(
+    "/custom-problems",
+    response_model=CustomProblemResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a new custom algorithmic problem in Educator Studio",
+)
+def create_custom_problem(
+    request: CustomProblemCreate,
+    current_teacher: User = Depends(get_current_teacher),
+    db: Session = Depends(get_db),
+):
+    return CustomProblemService.create_custom_problem(
+        db=db,
+        teacher_id=current_teacher.id,
+        data=request,
+    )
+
+
+@router.get(
+    "/custom-problems",
+    response_model=list[CustomProblemResponse],
+    summary="List all custom problems authored by current teacher",
+)
+def get_teacher_custom_problems(
+    current_teacher: User = Depends(get_current_teacher),
+    db: Session = Depends(get_db),
+):
+    return CustomProblemService.get_teacher_custom_problems(
+        db=db,
+        teacher_id=current_teacher.id,
+    )
+
+
+@router.get(
+    "/custom-problems/{problem_id}",
+    response_model=CustomProblemResponse,
+    summary="Get details of a custom problem",
+)
+def get_custom_problem(
+    problem_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return CustomProblemService.get_custom_problem_by_id(
+        db=db,
+        problem_id=problem_id,
+        user_id=current_user.id,
+    )
+
+
+@router.get(
+    "/custom-problems/{problem_id}/stats",
+    response_model=CustomProblemStatsResponse,
+    summary="Get global and class statistics for a custom problem",
+)
+def get_custom_problem_stats(
+    problem_id: UUID,
+    current_teacher: User = Depends(get_current_teacher),
+    db: Session = Depends(get_db),
+):
+    return CustomProblemService.get_custom_problem_stats(
+        db=db,
+        problem_id=problem_id,
+        teacher_id=current_teacher.id,
+    )
+
+
 # ============================================================
 # HOMEWORK ASSIGNMENT MANAGEMENT (TEACHER ROLE)
 # ============================================================
@@ -233,6 +334,8 @@ def create_assignments(
         teacher_id=current_teacher.id,
         student_ids=request.student_ids,
         lesson_id=request.lesson_id,
+        custom_problem_id=request.custom_problem_id,
+        quiz_id=request.quiz_id,
         due_date=request.due_date,
         notes=request.notes,
     )
@@ -272,6 +375,42 @@ def get_teacher_profile(
     )
 
 
+from app.schemas.quiz import QuizResponse
+from app.services.quiz_service import QuizService
+
+
+@router.get(
+    "/{teacher_id}/custom-problems",
+    response_model=list[CustomProblemResponse],
+    summary="Get custom problems authored by a teacher",
+)
+def get_teacher_profile_custom_problems(
+    teacher_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return CustomProblemService.get_teacher_published_custom_problems(
+        db=db,
+        teacher_id=teacher_id,
+    )
+
+
+@router.get(
+    "/{teacher_id}/quizzes",
+    response_model=list[QuizResponse],
+    summary="Get quizzes authored by a teacher",
+)
+def get_teacher_profile_quizzes(
+    teacher_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return QuizService.get_teacher_quizzes(
+        db=db,
+        teacher_id=teacher_id,
+    )
+
+
 @router.post(
     "/{teacher_id}/select",
     response_model=TeacherSelectionResponse,
@@ -286,3 +425,4 @@ def select_teacher(
         student_id=current_student.id,
         teacher_id=teacher_id,
     )
+

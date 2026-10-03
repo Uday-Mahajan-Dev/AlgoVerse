@@ -129,4 +129,5 @@ def get_my_badges(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return BadgeService.get_user_badges(db=db, user_id=current_user.id)
+    role_name = current_user.role.name if current_user.role else "STUDENT"
+    return BadgeService.get_user_badges(db=db, user_id=current_user.id, role=role_name)

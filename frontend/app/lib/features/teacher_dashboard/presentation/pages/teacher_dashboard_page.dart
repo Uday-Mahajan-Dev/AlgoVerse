@@ -65,6 +65,8 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
     final conceptsAsync = ref.watch(teacherConceptsProvider);
     final assignmentsAsync = ref.watch(teacherAssignmentsProvider);
     final taRequestsAsync = ref.watch(teacherTARequestsProvider);
+    final createdProblemsAsync = ref.watch(teacherCreatedProblemsProvider);
+    final createdQuizzesAsync = ref.watch(teacherCreatedQuizzesProvider);
 
     return Scaffold(
       key: _scaffoldKey,
@@ -176,6 +178,14 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
                               loading: () => const _LoadingCard(title: 'Student Roster'),
                               error: (e, _) => _buildErrorBanner('students roster', e),
                               data: (students) => _buildStudentsRosterCard(context, students),
+                            ),
+                            const SizedBox(height: 28),
+
+                            // My Created Content (Custom Problems & Live Quizzes)
+                            _buildCreatedContentCard(
+                              context,
+                              createdProblemsAsync.value ?? [],
+                              createdQuizzesAsync.value ?? [],
                             ),
                             const SizedBox(height: 28),
 
@@ -718,13 +728,25 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
           ),
           const SizedBox(height: 18),
 
-          if (bottlenecks.isEmpty)
+          if (bottlenecks.isEmpty || !bottlenecks.any((b) => b.completionRate > 0 || b.failureRate > 0 || b.avgAttempts > 0))
             Container(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
               alignment: Alignment.center,
-              child: Text(
-                'No bottlenecks detected! Students are progressing smoothly.',
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.bar_chart_rounded, size: 44, color: Colors.grey.shade400),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Not enough student data yet. Share your Class Code for students to join and generate analytics!',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontSize: 13,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
               ),
             )
           else
@@ -895,13 +917,25 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
           ),
           const SizedBox(height: 18),
 
-          if (concepts.isEmpty)
+          if (concepts.isEmpty || !concepts.any((c) => c.avgCompletionRate > 0))
             Container(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
               alignment: Alignment.center,
-              child: Text(
-                'No module data available yet.',
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.hub_outlined, size: 44, color: Colors.grey.shade400),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Not enough student data yet. Share your Class Code for students to join and generate analytics!',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontSize: 13,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
               ),
             )
           else
@@ -1192,6 +1226,392 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
     );
   }
 
+  Widget _buildCreatedContentCard(
+    BuildContext context,
+    List<dynamic> problems,
+    List<dynamic> quizzes,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.teal.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.auto_awesome_rounded,
+                    color: Colors.teal.shade700, size: 20),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'My Created Content',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    Text(
+                      'Custom coding problems & Kahoot live quizzes',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                onPressed: () => context.push('/educator-studio'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.teal.shade800,
+                  side: BorderSide(color: Colors.teal.shade300),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                icon: const Icon(Icons.add_rounded, size: 16),
+                label: const Text(
+                  'Educator Studio',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+
+          if (problems.isEmpty && quizzes.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(28),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Column(
+                children: [
+                  Icon(Icons.inventory_2_outlined, size: 36, color: Colors.grey.shade400),
+                  const SizedBox(height: 10),
+                  Text(
+                    'No custom content created yet.',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey.shade700,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Create custom coding problems or interactive live quizzes in the Educator Studio.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                  ),
+                ],
+              ),
+            )
+          else ...[
+            if (problems.isNotEmpty) ...[
+              Row(
+                children: [
+                  Icon(Icons.code_rounded, size: 16, color: Colors.teal.shade800),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Custom Coding Problems (${problems.length})',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.teal.shade900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: problems.length,
+                separatorBuilder: (context, index) => const SizedBox(height: 8),
+                itemBuilder: (context, index) {
+                  final prob = problems[index];
+                  final isPublic = prob['visibility'] == 'PUBLIC';
+                  final title = prob['title']?.toString() ?? 'Custom Problem';
+
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.teal.shade100,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(Icons.terminal_rounded, size: 18, color: Colors.teal.shade900),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                  color: Color(0xFF1E293B),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: isPublic ? Colors.blue.shade50 : Colors.purple.shade50,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      isPublic ? 'PUBLIC' : 'CLASS ONLY',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: isPublic ? Colors.blue.shade700 : Colors.purple.shade700,
+                                      ),
+                                    ),
+                                  ),
+                                  Text(
+                                    'Created ${_formatDate(DateTime.tryParse(prob['created_at']?.toString() ?? '') ?? DateTime.now())}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton.tonal(
+                          onPressed: () => _showProblemStats(context, prob),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.teal.shade50,
+                            foregroundColor: Colors.teal.shade800,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.analytics_outlined, size: 14),
+                              SizedBox(width: 4),
+                              Text(
+                                'View Stats',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 20),
+            ],
+            if (quizzes.isNotEmpty) ...[
+              Row(
+                children: [
+                  Icon(Icons.quiz_rounded, size: 16, color: Colors.amber.shade900),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Kahoot Live Quizzes (${quizzes.length})',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.amber.shade900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: quizzes.length,
+                separatorBuilder: (context, index) => const SizedBox(height: 8),
+                itemBuilder: (context, index) {
+                  final quiz = quizzes[index];
+                  final isPublic = quiz['visibility'] == 'PUBLIC';
+                  final title = quiz['title']?.toString() ?? 'Live Quiz';
+                  final questionsCount = (quiz['questions'] as List?)?.length ?? 0;
+                  final timePerQ = quiz['time_per_question_seconds'] ?? 30;
+
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.shade100,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(Icons.flash_on_rounded, size: 18, color: Colors.amber.shade900),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                  color: Color(0xFF1E293B),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: isPublic ? Colors.blue.shade50 : Colors.purple.shade50,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      isPublic ? 'PUBLIC' : 'CLASS ONLY',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: isPublic ? Colors.blue.shade700 : Colors.purple.shade700,
+                                      ),
+                                    ),
+                                  ),
+                                  Text(
+                                    '$questionsCount Qs • ${timePerQ}s/q',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton.tonal(
+                          onPressed: () => _showQuizStats(context, quiz),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.amber.shade50,
+                            foregroundColor: Colors.amber.shade900,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.bar_chart_rounded, size: 14),
+                              SizedBox(width: 4),
+                              Text(
+                                'View Stats',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _showProblemStats(BuildContext context, dynamic problem) {
+    final problemId = problem['id']?.toString() ?? '';
+    final title = problem['title']?.toString() ?? 'Custom Problem Stats';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _ProblemStatsSheet(problemId: problemId, title: title),
+    );
+  }
+
+  void _showQuizStats(BuildContext context, dynamic quiz) {
+    final quizId = quiz['id']?.toString() ?? '';
+    final title = quiz['title']?.toString() ?? 'Quiz Stats';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _QuizStatsSheet(quizId: quizId, title: title),
+    );
+  }
+
   Widget _buildActivityFeedCard(
     BuildContext context,
     List<RecentActivityItemEntity> feed,
@@ -1388,7 +1808,7 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            a.lessonTitle,
+                            a.lessonTitle ?? a.title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -1486,3 +1906,678 @@ class _LoadingCard extends StatelessWidget {
     );
   }
 }
+
+class _ProblemStatsSheet extends StatefulWidget {
+  final String problemId;
+  final String title;
+
+  const _ProblemStatsSheet({
+    required this.problemId,
+    required this.title,
+  });
+
+  @override
+  State<_ProblemStatsSheet> createState() => _ProblemStatsSheetState();
+}
+
+class _ProblemStatsSheetState extends State<_ProblemStatsSheet> {
+  bool _isLoading = true;
+  String? _error;
+  Map<String, dynamic>? _stats;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchStats();
+  }
+
+  Future<void> _fetchStats() async {
+    try {
+      final token = await TokenStorage.getAccessToken();
+      if (token == null || token.isEmpty) {
+        setState(() {
+          _error = 'User not authenticated';
+          _isLoading = false;
+        });
+        return;
+      }
+      final data = await ApiClient.getCustomProblemStats(
+        accessToken: token,
+        problemId: widget.problemId,
+      );
+      setState(() {
+        _stats = data;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString().replaceAll('Exception: ', '').trim();
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.75,
+      maxChildSize: 0.95,
+      minChildSize: 0.4,
+      builder: (ctx, scrollCtrl) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.teal.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.analytics_rounded, color: Colors.teal.shade800),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        Text(
+                          'Detailed Student Performance & Pass Rates',
+                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+              const Divider(height: 24),
+              Expanded(
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _error != null
+                        ? Center(
+                            child: Text(
+                              'Failed to load stats: $_error',
+                              style: TextStyle(color: Colors.red.shade700),
+                            ),
+                          )
+                        : _buildStatsContent(scrollCtrl),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildStatsContent(ScrollController scrollCtrl) {
+    final stats = _stats!;
+    final totalAttempts = stats['total_attempts'] ?? 0;
+    final successful = stats['successful_submissions'] ?? 0;
+    final passRate = (stats['pass_rate'] ?? 0.0).toStringAsFixed(1);
+    final visibility = stats['visibility']?.toString() ?? 'CLASS_ONLY';
+    final classStudents = (stats['class_students'] as List?) ?? [];
+
+    return ListView(
+      controller: scrollCtrl,
+      children: [
+        // KPI Cards Row
+        Row(
+          children: [
+            Expanded(
+              child: _buildMetricCard(
+                label: 'Total Attempts',
+                value: '$totalAttempts',
+                icon: Icons.refresh_rounded,
+                color: Colors.blue,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildMetricCard(
+                label: 'Successful (AC)',
+                value: '$successful',
+                icon: Icons.check_circle_rounded,
+                color: Colors.green,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildMetricCard(
+                label: 'Pass Rate',
+                value: '$passRate%',
+                icon: Icons.trending_up_rounded,
+                color: Colors.purple,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+
+        if (visibility == 'PUBLIC') ...[
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.blue.shade200),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.public_rounded, color: Colors.blue.shade800, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'This is a Public Problem. Total attempts include all AlgoVerse students globally. Individual breakdown below displays your paired classroom students.',
+                    style: TextStyle(fontSize: 12, color: Colors.blue.shade900),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
+
+        Text(
+          'Classroom Student Roster (${classStudents.length})',
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF0F172A),
+          ),
+        ),
+        const SizedBox(height: 10),
+
+        if (classStudents.isEmpty)
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Center(
+              child: Text(
+                'No students in your class roster yet.',
+                style: TextStyle(color: Colors.grey.shade500),
+              ),
+            ),
+          )
+        else
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: classStudents.length,
+            separatorBuilder: (ctx, i) => const Divider(height: 14),
+            itemBuilder: (ctx, i) {
+              final student = classStudents[i];
+              final hasSolved = student['has_solved'] == true;
+              final attempts = student['total_attempts'] ?? 0;
+              final name = student['student_name']?.toString() ?? 'Student';
+              final email = student['student_email']?.toString() ?? '';
+
+              return Row(
+                children: [
+                  CircleAvatar(
+                    radius: 16,
+                    backgroundColor: hasSolved ? Colors.green.shade100 : Colors.grey.shade200,
+                    child: Icon(
+                      hasSolved ? Icons.check_rounded : (attempts > 0 ? Icons.timelapse_rounded : Icons.person_outline),
+                      size: 16,
+                      color: hasSolved ? Colors.green.shade800 : Colors.grey.shade700,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                        Text(
+                          email,
+                          style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: hasSolved
+                          ? Colors.green.shade50
+                          : (attempts > 0 ? Colors.amber.shade50 : Colors.grey.shade100),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      hasSolved
+                          ? 'SOLVED ($attempts ${attempts == 1 ? 'try' : 'tries'})'
+                          : (attempts > 0 ? '$attempts ATTEMPTS' : 'NOT STARTED'),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: hasSolved
+                            ? Colors.green.shade800
+                            : (attempts > 0 ? Colors.amber.shade900 : Colors.grey.shade600),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+      ],
+    );
+  }
+
+  Widget _buildMetricCard({
+    required String label,
+    required String value,
+    required IconData icon,
+    required MaterialColor color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color.shade800, size: 20),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: color.shade900,
+            ),
+          ),
+          Text(
+            label,
+            style: TextStyle(fontSize: 11, color: color.shade800),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuizStatsSheet extends StatefulWidget {
+  final String quizId;
+  final String title;
+
+  const _QuizStatsSheet({
+    required this.quizId,
+    required this.title,
+  });
+
+  @override
+  State<_QuizStatsSheet> createState() => _QuizStatsSheetState();
+}
+
+class _QuizStatsSheetState extends State<_QuizStatsSheet> {
+  bool _isLoading = true;
+  String? _error;
+  Map<String, dynamic>? _stats;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchStats();
+  }
+
+  Future<void> _fetchStats() async {
+    try {
+      final token = await TokenStorage.getAccessToken();
+      if (token == null || token.isEmpty) {
+        setState(() {
+          _error = 'User not authenticated';
+          _isLoading = false;
+        });
+        return;
+      }
+      final data = await ApiClient.getQuizStats(
+        accessToken: token,
+        quizId: widget.quizId,
+      );
+      setState(() {
+        _stats = data;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString().replaceAll('Exception: ', '').trim();
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.75,
+      maxChildSize: 0.95,
+      minChildSize: 0.4,
+      builder: (ctx, scrollCtrl) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.flash_on_rounded, color: Colors.amber.shade900),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        Text(
+                          'Live Quiz Leaderboard & Completion Stats',
+                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+              const Divider(height: 24),
+              Expanded(
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _error != null
+                        ? Center(
+                            child: Text(
+                              'Failed to load quiz stats: $_error',
+                              style: TextStyle(color: Colors.red.shade700),
+                            ),
+                          )
+                        : _buildStatsContent(scrollCtrl),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildStatsContent(ScrollController scrollCtrl) {
+    final stats = _stats!;
+    final totalAttempts = stats['total_attempts'] ?? 0;
+    final avgScore = (stats['avg_score'] ?? 0.0).toStringAsFixed(1);
+    final highScore = stats['high_score'] ?? 0;
+    final visibility = stats['visibility']?.toString() ?? 'CLASS_ONLY';
+    final classStudents = (stats['class_students'] as List?) ?? [];
+
+    return ListView(
+      controller: scrollCtrl,
+      children: [
+        // KPI Cards Row
+        Row(
+          children: [
+            Expanded(
+              child: _buildMetricCard(
+                label: 'Total Plays',
+                value: '$totalAttempts',
+                icon: Icons.play_arrow_rounded,
+                color: Colors.amber,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildMetricCard(
+                label: 'Avg Score',
+                value: '$avgScore pts',
+                icon: Icons.score_rounded,
+                color: Colors.blue,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildMetricCard(
+                label: 'High Score',
+                value: '$highScore pts',
+                icon: Icons.emoji_events_rounded,
+                color: Colors.purple,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+
+        if (visibility == 'PUBLIC') ...[
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.blue.shade200),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.public_rounded, color: Colors.blue.shade800, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'This is a Public Quiz. Total plays and average scores include all AlgoVerse students globally. Below displays scores for your paired classroom students.',
+                    style: TextStyle(fontSize: 12, color: Colors.blue.shade900),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
+
+        Text(
+          'Classroom Quiz Leaderboard (${classStudents.length})',
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF0F172A),
+          ),
+        ),
+        const SizedBox(height: 10),
+
+        if (classStudents.isEmpty)
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Center(
+              child: Text(
+                'No student scores recorded yet.',
+                style: TextStyle(color: Colors.grey.shade500),
+              ),
+            ),
+          )
+        else
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: classStudents.length,
+            separatorBuilder: (ctx, i) => const Divider(height: 14),
+            itemBuilder: (ctx, i) {
+              final student = classStudents[i];
+              final hasParticipated = student['has_participated'] == true;
+              final score = student['score'] ?? 0;
+              final timeSeconds = student['total_time_seconds'] ?? 0;
+              final name = student['student_name']?.toString() ?? 'Student';
+              final email = student['student_email']?.toString() ?? '';
+
+              return Row(
+                children: [
+                  CircleAvatar(
+                    radius: 16,
+                    backgroundColor: hasParticipated ? Colors.amber.shade100 : Colors.grey.shade200,
+                    child: Text(
+                      '${i + 1}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        color: hasParticipated ? Colors.amber.shade900 : Colors.grey.shade700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                        Text(
+                          email,
+                          style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  if (hasParticipated)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '$score pts',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        Text(
+                          '${timeSeconds}s',
+                          style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                        ),
+                      ],
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        'NOT PLAYED',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+      ],
+    );
+  }
+
+  Widget _buildMetricCard({
+    required String label,
+    required String value,
+    required IconData icon,
+    required MaterialColor color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color.shade800, size: 20),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: color.shade900,
+            ),
+          ),
+          Text(
+            label,
+            style: TextStyle(fontSize: 11, color: color.shade800),
+          ),
+        ],
+      ),
+    );
+  }
+}

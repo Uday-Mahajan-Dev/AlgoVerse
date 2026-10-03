@@ -6,6 +6,8 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/token_storage.dart';
 
 class SocialAuthService {
+  static final SocialAuthService _instance = SocialAuthService._();
+  factory SocialAuthService() => _instance;
   SocialAuthService._();
 
   static final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
@@ -198,9 +200,17 @@ class SocialAuthService {
       try {
         await _googleSignIn.signOut();
       } catch (_) {
-        // Google may not have been used.
+        // Google sign out error ignored.
+      }
+      try {
+        await _googleSignIn.disconnect();
+      } catch (_) {
+        // Disconnect can throw if not previously signed in with Google.
       }
     }
   }
+
+  /// Instance method wrapper for `SocialAuthService().signOut()`.
+  Future<void> logOut() => signOut();
 }
 

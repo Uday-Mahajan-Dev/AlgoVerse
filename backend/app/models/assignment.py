@@ -25,10 +25,24 @@ class Assignment(BaseModel):
         index=True,
     )
 
-    lesson_id: Mapped[uuid.UUID] = mapped_column(
+    lesson_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("lessons.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
+        index=True,
+    )
+
+    custom_problem_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("custom_problems.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+
+    quiz_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("quizzes.id", ondelete="CASCADE"),
+        nullable=True,
         index=True,
     )
 
@@ -73,4 +87,14 @@ class Assignment(BaseModel):
     lesson = relationship(
         "Lesson",
         foreign_keys=[lesson_id],
+    )
+
+    custom_problem = relationship(
+        "CustomProblem",
+        foreign_keys=[custom_problem_id],
+    )
+
+    quiz = relationship(
+        "Quiz",
+        foreign_keys=[quiz_id],
     )

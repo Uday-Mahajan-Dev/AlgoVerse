@@ -19,3 +19,8 @@ from .teacher_profile import TeacherProfile
 from .ta_approval_request import TAApprovalRequest
 from .badge import Badge
 from .user_badge import UserBadge
+from .custom_problem import CustomProblem
+from .quiz import Quiz
+from .quiz_question import QuizQuestion
+from .quiz_attempt import QuizAttempt
+from .notification import Notification

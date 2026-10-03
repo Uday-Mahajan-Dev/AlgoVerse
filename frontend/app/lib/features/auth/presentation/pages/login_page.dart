@@ -1,22 +1,22 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_routes.dart';
-import '../../../../core/network/api_client.dart';
-import '../../../../core/storage/token_storage.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/widgets/social_login_button.dart';
 import '../../data/social_auth_service.dart';
+import '../providers/auth_provider.dart';
 
-class LoginPage extends StatefulWidget {
+class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
 
   @override
-  State<LoginPage> createState() => _LoginPageState();
+  ConsumerState<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginPageState extends State<LoginPage> {
+class _LoginPageState extends ConsumerState<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
@@ -50,9 +50,10 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      final tokens = await ApiClient.login(email: email, password: password);
-
-      final role = await _saveTokens(tokens);
+      final role = await ref.read(authNotifierProvider.notifier).login(
+            email: email,
+            password: password,
+          );
 
       if (!mounted) return;
 
@@ -113,9 +114,9 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      final tokens = await loginMethod();
-
-      final role = await _saveTokens(tokens);
+      final role = await ref.read(authNotifierProvider.notifier).socialLogin(
+            loginMethod,
+          );
 
       if (!mounted) return;
 
@@ -150,35 +151,6 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  // ============================================================
-  // SAVE TOKENS
-  // ============================================================
-
-  Future<String> _saveTokens(Map<String, dynamic> tokens) async {
-    final accessToken = tokens['access_token']?.toString();
-    final refreshToken = tokens['refresh_token']?.toString();
-
-    if (accessToken == null ||
-        accessToken.isEmpty ||
-        refreshToken == null ||
-        refreshToken.isEmpty) {
-      throw Exception('Invalid authentication response from server.');
-    }
-
-    String role = 'STUDENT';
-    try {
-      final user = await ApiClient.me(accessToken);
-      role = (user['role_name']?.toString() ?? 'STUDENT').toUpperCase();
-    } catch (_) {}
-
-    await TokenStorage.saveTokens(
-      accessToken: accessToken,
-      refreshToken: refreshToken,
-      role: role,
-    );
-
-    return role;
-  }
 
   String _cleanError(Object error) {
     return error.toString().replaceFirst('Exception: ', '');

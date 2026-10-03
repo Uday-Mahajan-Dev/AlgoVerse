@@ -1,24 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/token_storage.dart';
-import '../../../auth/data/social_auth_service.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 
-class ProfilePage extends StatefulWidget {
+class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
 
   @override
-  State<ProfilePage> createState() => _ProfilePageState();
+  ConsumerState<ProfilePage> createState() => _ProfilePageState();
 }
 
-class _ProfilePageState extends State<ProfilePage> {
+class _ProfilePageState extends ConsumerState<ProfilePage> {
   bool _isLoading = true;
   bool _isLoggingOut = false;
   String? _errorMessage;
+  bool _isAuthError = false;
   Map<String, dynamic>? _userData;
   List<dynamic> _badges = [];
 
@@ -32,12 +34,20 @@ class _ProfilePageState extends State<ProfilePage> {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
+      _isAuthError = false;
     });
 
     try {
       final token = await TokenStorage.getAccessToken();
       if (token == null || token.isEmpty) {
-        throw Exception('Not authenticated. Please log in.');
+        if (mounted) {
+          setState(() {
+            _errorMessage = 'You are not logged in. Please sign in to view your profile.';
+            _isAuthError = true;
+            _isLoading = false;
+          });
+        }
+        return;
       }
 
       final data = await ApiClient.me(token);
@@ -57,8 +67,17 @@ class _ProfilePageState extends State<ProfilePage> {
       }
     } catch (e) {
       if (mounted) {
+        final errText = e.toString().replaceFirst('Exception: ', '');
+        final isAuth = errText.toLowerCase().contains('401') ||
+            errText.toLowerCase().contains('unauthorized') ||
+            errText.toLowerCase().contains('not authenticated') ||
+            errText.toLowerCase().contains('session expired');
+
         setState(() {
-          _errorMessage = e.toString().replaceFirst('Exception: ', '');
+          _errorMessage = isAuth
+              ? 'Your session has expired. Please log in again.'
+              : errText;
+          _isAuthError = isAuth;
           _isLoading = false;
         });
       }
@@ -92,22 +111,11 @@ class _ProfilePageState extends State<ProfilePage> {
     });
 
     try {
-      final refreshToken = await TokenStorage.getRefreshToken();
-      if (refreshToken != null && refreshToken.isNotEmpty) {
-        try {
-          await ApiClient.logout(refreshToken);
-        } catch (_) {}
-      }
-
-      try {
-        await SocialAuthService.signOut();
-      } catch (_) {}
-
-      await TokenStorage.clear();
-
+      await ref.read(authNotifierProvider.notifier).logout(context: context);
       if (!mounted) return;
-
-      context.go(AppRoutes.login);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Logged out successfully')),
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -185,24 +193,59 @@ class _ProfilePageState extends State<ProfilePage> {
                 ? Center(
                     child: Padding(
                       padding: const EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.error_outline_rounded,
-                              size: 48, color: Colors.red),
-                          const SizedBox(height: 12),
-                          Text(
-                            _errorMessage!,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(fontSize: 14),
-                          ),
-                          const SizedBox(height: 16),
-                          FilledButton.icon(
-                            onPressed: _loadProfileAndBadges,
-                            icon: const Icon(Icons.refresh_rounded),
-                            label: const Text('Retry'),
-                          ),
-                        ],
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 400),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _isAuthError
+                                  ? Icons.lock_person_rounded
+                                  : Icons.error_outline_rounded,
+                              size: 56,
+                              color: _isAuthError ? Colors.amber.shade800 : Colors.red,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              _isAuthError
+                                  ? 'Authentication Required'
+                                  : 'Unable to Load Profile',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              _errorMessage!,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey.shade700,
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            if (_isAuthError)
+                              SizedBox(
+                                width: double.infinity,
+                                height: 48,
+                                child: FilledButton.icon(
+                                  onPressed: () => context.go(AppRoutes.login),
+                                  icon: const Icon(Icons.login_rounded),
+                                  label: const Text('Go to Login'),
+                                ),
+                              )
+                            else
+                              SizedBox(
+                                width: double.infinity,
+                                height: 48,
+                                child: FilledButton.icon(
+                                  onPressed: _loadProfileAndBadges,
+                                  icon: const Icon(Icons.refresh_rounded),
+                                  label: const Text('Retry'),
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
                   )
@@ -213,6 +256,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         constraints: const BoxConstraints(maxWidth: 680),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
+
                           children: [
                             // Pending TA status banner (if applicant)
                             if (_userData?['ta_application_status'] == 'PENDING') ...[
@@ -714,28 +758,6 @@ class _ProfilePageState extends State<ProfilePage> {
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                 ),
               ],
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: FilledButton.icon(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Colors.purple.shade700,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  onPressed: () {
-                    context.go('/teacher-dashboard');
-                  },
-                  icon: const Icon(Icons.dashboard_customize_rounded, size: 20),
-                  label: const Text(
-                    'Go to Teacher Analytics Dashboard →',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                  ),
-                ),
-              ),
             ],
           ),
         ),

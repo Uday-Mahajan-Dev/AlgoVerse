@@ -10,6 +10,16 @@ class InvalidCredentialsException(HTTPException):
         )
 
 
+class NotAuthenticatedException(HTTPException):
+
+    def __init__(self, detail: str = "Invalid or expired session. Please log in again."):
+        super().__init__(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=detail,
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
 class EmailAlreadyExistsException(HTTPException):
 
     def __init__(self):

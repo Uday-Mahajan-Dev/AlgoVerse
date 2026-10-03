@@ -102,7 +102,7 @@ class AITutorService:
             import google.generativeai as genai
             genai.configure(api_key=settings.AI_API_KEY)
             model = genai.GenerativeModel(
-                model_name=settings.AI_MODEL or "gemini-2.0-flash",
+                model_name=settings.AI_MODEL or "gemini-1.5-flash",
                 system_instruction=system_prompt,
                 generation_config={"temperature": 0.4},
             )

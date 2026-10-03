@@ -6,9 +6,15 @@ class TeacherEntity {
   final String? email;
   final String? avatarUrl;
   final String? bio;
+  final String? professionalBio;
   final String? country;
   final int studentCount;
   final String specialty;
+  final String? institutionName;
+  final String? designation;
+  final String? classCode;
+  final String? instagramUrl;
+  final String? linkedinUrl;
   final DateTime? createdAt;
 
   const TeacherEntity({
@@ -19,9 +25,15 @@ class TeacherEntity {
     this.email,
     this.avatarUrl,
     this.bio,
+    this.professionalBio,
     this.country,
     required this.studentCount,
     required this.specialty,
+    this.institutionName,
+    this.designation,
+    this.classCode,
+    this.instagramUrl,
+    this.linkedinUrl,
     this.createdAt,
   });
 

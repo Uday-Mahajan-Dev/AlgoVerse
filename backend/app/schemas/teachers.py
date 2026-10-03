@@ -29,15 +29,20 @@ class TeacherProfileResponse(BaseModel):
     email: str | None = None
     avatar_url: str | None = None
     bio: str | None = None
+    professional_bio: str | None = None
     country: str | None = None
     student_count: int = 0
     specialty: str | None = None
     institution_name: str | None = None
     designation: str | None = None
+    subject_expertise: str | None = None
     class_code: str | None = None
+    instagram_url: str | None = None
+    linkedin_url: str | None = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
 
 
 class TeacherSelectionResponse(BaseModel):

@@ -1,23 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_routes.dart';
-import '../../../../core/network/api_client.dart';
-import '../../../../core/storage/token_storage.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/primary_button.dart';
 import '../../../../core/widgets/section_title.dart';
-import '../../../auth/data/social_auth_service.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 
-class HomePage extends StatefulWidget {
+class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  ConsumerState<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends ConsumerState<HomePage> {
   bool _isLoggingOut = false;
 
   Future<void> _logout() async {
@@ -28,28 +27,11 @@ class _HomePageState extends State<HomePage> {
     });
 
     try {
-      final refreshToken = await TokenStorage.getRefreshToken();
-
-      if (refreshToken != null && refreshToken.isNotEmpty) {
-        try {
-          await ApiClient.logout(refreshToken);
-        } catch (_) {
-          // Even if the server logout fails, clear local credentials.
-        }
+      await ref.read(authNotifierProvider.notifier).logout(context: context);
+    } catch (_) {
+      if (mounted) {
+        context.go(AppRoutes.login);
       }
-
-      // Sign out of Firebase/Google/GitHub if a social login was used.
-      try {
-        await SocialAuthService.signOut();
-      } catch (_) {
-        // Ignore social sign-out errors.
-      }
-
-      await TokenStorage.clear();
-
-      if (!mounted) return;
-
-      context.go(AppRoutes.login);
     } finally {
       if (mounted) {
         setState(() {

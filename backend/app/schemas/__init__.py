@@ -11,3 +11,4 @@ from .courses import (
     LessonCompletionResponse,
     CourseProgressResponse,
 )
+from .notification import NotificationBase, NotificationCreate, NotificationResponse, NotificationListResponse

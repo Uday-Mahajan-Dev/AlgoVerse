@@ -61,7 +61,9 @@ class ConceptPerformanceResponse(BaseModel):
 
 class AssignmentCreateRequest(BaseModel):
     student_ids: list[UUID]
-    lesson_id: UUID
+    lesson_id: UUID | None = None
+    custom_problem_id: UUID | None = None
+    quiz_id: UUID | None = None
     due_date: datetime | None = None
     notes: str | None = None
 
@@ -72,11 +74,15 @@ class AssignmentResponse(BaseModel):
     teacher_name: str
     student_id: UUID
     student_name: str
-    lesson_id: UUID
-    lesson_slug: str
-    lesson_title: str
-    course_title: str
-    course_slug: str
+    assignment_type: str = "LESSON"  # "LESSON" | "CUSTOM_PROBLEM" | "QUIZ"
+    lesson_id: UUID | None = None
+    lesson_slug: str | None = None
+    lesson_title: str | None = None
+    course_title: str | None = None
+    course_slug: str | None = None
+    custom_problem_id: UUID | None = None
+    quiz_id: UUID | None = None
+    title: str = ""
     assigned_at: datetime
     due_date: datetime | None = None
     status: str  # "pending", "completed", "overdue"

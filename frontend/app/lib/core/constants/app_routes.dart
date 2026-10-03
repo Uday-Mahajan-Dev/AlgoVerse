@@ -29,6 +29,11 @@ class AppRoutes {
   static const teachers = '/teachers';
   static const becomeEducator = '/become-educator';
   static const courses = '/courses';
+  static const educatorStudio = '/educator-studio';
+  static const quizzes = '/quizzes';
+  static const quizPlay = '/quizzes/:id/play';
+  static const quizLeaderboard = '/quizzes/:id/leaderboard';
+  static const customProblemView = '/custom-problems/:id';
   static const settings = '/settings';
 }
 

@@ -5,7 +5,9 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/token_storage.dart';
-import '../../../auth/data/social_auth_service.dart';
+import '../../../../core/widgets/notifications_sheet.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
+
 import '../../../courses/domain/entities/course_entity.dart';
 import '../../../courses/presentation/providers/course_provider.dart';
 import '../../../learning/domain/entities/ai_tutor_entity.dart';
@@ -60,21 +62,8 @@ class _StudentDashboardPageState extends ConsumerState<StudentDashboardPage> {
     });
 
     try {
-      final refreshToken = await TokenStorage.getRefreshToken();
-      if (refreshToken != null && refreshToken.isNotEmpty) {
-        try {
-          await ApiClient.logout(refreshToken);
-        } catch (_) {}
-      }
-      try {
-        await SocialAuthService.signOut();
-      } catch (_) {}
-
-      await TokenStorage.clear();
-
+      await ref.read(authNotifierProvider.notifier).logout(context: context);
       if (!mounted) return;
-
-      context.go(AppRoutes.login);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Logged out successfully')),
       );
@@ -90,6 +79,7 @@ class _StudentDashboardPageState extends ConsumerState<StudentDashboardPage> {
       );
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -155,6 +145,71 @@ class _StudentDashboardPageState extends ConsumerState<StudentDashboardPage> {
                   const SizedBox(height: 28),
 
                   MentorSection(myTeacherAsync: myTeacherAsync),
+                  const SizedBox(height: 24),
+
+                  // Live Quiz Arena Card
+                  Card(
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      side: BorderSide(color: Colors.amber.shade200),
+                    ),
+                    color: Colors.amber.shade50,
+                    child: Padding(
+                      padding: const EdgeInsets.all(18),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.shade100,
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Icon(
+                              Icons.sports_esports_rounded,
+                              color: Colors.amber.shade900,
+                              size: 28,
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Kahoot-Style Live Quizzes',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Play timed MCQs, compete with classmates, and climb the leaderboard!',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.amber.shade900,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          FilledButton(
+                            onPressed: () => context.push(AppRoutes.quizzes),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: Colors.amber.shade800,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            child: const Text('Play Now', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 28),
 
                   SectionTitle(
@@ -174,6 +229,9 @@ class _StudentDashboardPageState extends ConsumerState<StudentDashboardPage> {
                   const SizedBox(height: 12),
                   StudentHomeworkSection(assignmentsAsync: studentAssignmentsAsync),
                   const SizedBox(height: 28),
+
+                  const MentorChallengesSection(),
+
 
                   const SectionTitle(title: '🤖 AI RECOMMENDED FOR YOU'),
                   const SizedBox(height: 12),
@@ -260,223 +318,33 @@ class DashboardHeader extends StatefulWidget {
 }
 
 class _DashboardHeaderState extends State<DashboardHeader> {
-  bool _hasUnreadNotifications = true;
+  bool _hasUnreadNotifications = false;
 
-  void _showNotifications(BuildContext context) {
-    setState(() {
-      _hasUnreadNotifications = false;
-    });
-
-    final theme = Theme.of(context);
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: theme.scaffoldBackgroundColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (sheetContext) {
-        return DraggableScrollableSheet(
-          initialChildSize: 0.65,
-          minChildSize: 0.4,
-          maxChildSize: 0.9,
-          expand: false,
-          builder: (scrollContext, scrollController) {
-            return Column(
-              children: [
-                const SizedBox(height: 12),
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade400,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Icon(
-                          Icons.notifications_active_rounded,
-                          color: theme.colorScheme.primary,
-                          size: 20,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      const Expanded(
-                        child: Text(
-                          'System Alerts & Updates',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: () => Navigator.of(sheetContext).pop(),
-                        icon: const Icon(Icons.close_rounded),
-                        tooltip: 'Close',
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 1),
-                Expanded(
-                  child: ListView(
-                    controller: scrollController,
-                    padding: const EdgeInsets.all(16),
-                    children: [
-                      _buildNotificationTile(
-                        icon: Icons.auto_stories_rounded,
-                        iconColor: Colors.deepPurple,
-                        title: 'Welcome to AlgoVerse!',
-                        subtitle:
-                            'Your adaptive learning portal is live. Master DSA through interactive step-by-step visualizations and hands-on coding challenges.',
-                        time: 'Just now',
-                        isNew: true,
-                      ),
-                      const SizedBox(height: 12),
-                      _buildNotificationTile(
-                        icon: Icons.visibility_rounded,
-                        iconColor: Colors.indigo,
-                        title: 'Interactive Arrays Visualizations',
-                        subtitle:
-                            'New algorithm visualizations for Two Pointers, Sliding Window, and Prefix Sum algorithms are ready for you to explore.',
-                        time: '2 hours ago',
-                        isNew: true,
-                      ),
-                      const SizedBox(height: 12),
-                      _buildNotificationTile(
-                        icon: Icons.assignment_turned_in_rounded,
-                        iconColor: Colors.teal,
-                        title: 'Classroom & Homework Linked',
-                        subtitle:
-                            'Join your educator\'s class using your 6-character class code to receive personalized homework assignments and direct mentor feedback.',
-                        time: '1 day ago',
-                        isNew: false,
-                      ),
-                      const SizedBox(height: 12),
-                      _buildNotificationTile(
-                        icon: Icons.military_tech_rounded,
-                        iconColor: Colors.amber.shade800,
-                        title: 'Achievement Badges Activated',
-                        subtitle:
-                            'Unlock gamified achievement badges on your profile by solving challenges, maintaining streaks, and completing course modules.',
-                        time: '2 days ago',
-                        isNew: false,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
+  @override
+  void initState() {
+    super.initState();
+    _checkNotifications();
   }
 
-  Widget _buildNotificationTile({
-    required IconData icon,
-    required Color iconColor,
-    required String title,
-    required String subtitle,
-    required String time,
-    required bool isNew,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isNew
-            ? iconColor.withValues(alpha: 0.06)
-            : Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isNew
-              ? iconColor.withValues(alpha: 0.3)
-              : Colors.grey.shade200,
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: iconColor, size: 22),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        title,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    if (isNew)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: iconColor,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Text(
-                          'NEW',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade700,
-                    height: 1.3,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  time,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.grey.shade500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+  Future<void> _checkNotifications() async {
+    try {
+      final token = await TokenStorage.getAccessToken();
+      if (token != null) {
+        final res = await ApiClient.getNotifications(accessToken: token, limit: 1);
+        final unread = res['unread_count'] as int? ?? 0;
+        if (mounted) {
+          setState(() {
+            _hasUnreadNotifications = unread > 0;
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
+  void _showNotifications(BuildContext context) {
+    NotificationsSheet.show(
+      context,
+      onDismiss: _checkNotifications,
     );
   }
 
@@ -534,6 +402,7 @@ class _DashboardHeaderState extends State<DashboardHeader> {
     );
   }
 }
+
 
 //
 // SECTION TITLE
@@ -1949,6 +1818,11 @@ class StudentHomeworkSection extends StatelessWidget {
               statusText = 'PENDING';
             }
 
+            final displayTitle = a.title.isNotEmpty ? a.title : (a.lessonTitle ?? 'Homework Assignment');
+            final displaySubtitle = a.customProblemId != null
+                ? 'Educator Studio • Custom Coding Problem'
+                : (a.quizId != null ? 'Live Quiz • Kahoot Style' : (a.courseTitle ?? 'DSA Course'));
+
             return Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
@@ -2012,7 +1886,7 @@ class StudentHomeworkSection extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    a.lessonTitle,
+                    displayTitle,
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -2021,7 +1895,7 @@ class StudentHomeworkSection extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    a.courseTitle,
+                    displaySubtitle,
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey.shade500,
@@ -2051,9 +1925,15 @@ class StudentHomeworkSection extends StatelessWidget {
                     width: double.infinity,
                     child: FilledButton.icon(
                       onPressed: () {
-                        context.push(
-                          '/courses/${a.courseSlug}/lessons/${a.lessonSlug}',
-                        );
+                        if (a.customProblemId != null && a.customProblemId!.isNotEmpty) {
+                          context.push('/custom-problems/${a.customProblemId}');
+                        } else if (a.quizId != null && a.quizId!.isNotEmpty) {
+                          context.push('/quizzes/${a.quizId}/play');
+                        } else if (a.courseSlug != null && a.lessonSlug != null) {
+                          context.push(
+                            '/courses/${a.courseSlug}/lessons/${a.lessonSlug}',
+                          );
+                        }
                       },
                       style: FilledButton.styleFrom(
                         backgroundColor: isCompleted
@@ -2071,7 +1951,7 @@ class StudentHomeworkSection extends StatelessWidget {
                         size: 18,
                       ),
                       label: Text(
-                        isCompleted ? 'Review Lesson' : 'Start Assignment',
+                        isCompleted ? 'Review' : 'Start Assignment',
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 13,
@@ -2264,3 +2144,209 @@ class AIRecommendationsSection extends StatelessWidget {
     );
   }
 }
+
+class MentorChallengesSection extends StatefulWidget {
+  const MentorChallengesSection({super.key});
+
+  @override
+  State<MentorChallengesSection> createState() => _MentorChallengesSectionState();
+}
+
+class _MentorChallengesSectionState extends State<MentorChallengesSection> {
+  bool _isLoading = true;
+  List<dynamic> _challenges = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchMentorChallenges();
+  }
+
+  Future<void> _fetchMentorChallenges() async {
+    try {
+      final token = await TokenStorage.getAccessToken();
+      final res = await ApiClient.getMentorCustomProblems(accessToken: token);
+      if (mounted) {
+        setState(() {
+          _challenges = res;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _challenges = [];
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const SizedBox(
+        height: 100,
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_challenges.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionTitle(title: '⭐ CHALLENGES FROM YOUR MENTOR'),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 165,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: _challenges.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 14),
+            itemBuilder: (context, index) {
+              final c = _challenges[index];
+              final id = c['id']?.toString() ?? '';
+              final title = c['title']?.toString() ?? 'Custom Challenge';
+              final teacherName = c['teacher_name']?.toString() ?? 'Mentor';
+              final desc = c['description']?.toString() ?? '';
+              final hasPython = (c['starter_code_python']?.toString().isNotEmpty ?? false) || (c['starter_code']?.toString().isNotEmpty ?? false);
+              final hasJava = c['starter_code_java']?.toString().isNotEmpty ?? false;
+              final hasCpp = c['starter_code_cpp']?.toString().isNotEmpty ?? false;
+
+              return InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () {
+                  context.push('/custom-problem/$id');
+                },
+                child: Container(
+                  width: 270,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.02),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: Colors.purple.shade50,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  'By $teacherName',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.purple.shade800,
+                                  ),
+                                ),
+                              ),
+                              const Spacer(),
+                              Icon(Icons.code_rounded, size: 16, color: Colors.purple.shade600),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                          if (desc.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              desc,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey.shade600,
+                                height: 1.3,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              if (hasPython)
+                                _buildLangChip('Py', const Color(0xFF3776AB)),
+                              if (hasJava)
+                                _buildLangChip('Java', const Color(0xFFE76F00)),
+                              if (hasCpp)
+                                _buildLangChip('C++', const Color(0xFF00599C)),
+                            ],
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0F172A),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.terminal_rounded, size: 14, color: Colors.white),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Solve',
+                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 28),
+      ],
+    );
+  }
+
+  Widget _buildLangChip(String label, Color color) {
+    return Container(
+      margin: const EdgeInsets.only(right: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: color),
+      ),
+    );
+  }
+}
+

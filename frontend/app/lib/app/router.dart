@@ -1,15 +1,22 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/constants/app_routes.dart';
-import '../core/storage/token_storage.dart';
 import '../features/auth/presentation/pages/login_page.dart';
 import '../features/auth/presentation/pages/register_page.dart';
 import '../features/auth/presentation/pages/verify_email_page.dart';
+import '../features/auth/presentation/providers/auth_provider.dart';
 import '../features/courses/presentation/pages/course_catalog_page.dart';
 import '../features/courses/presentation/pages/course_detail_page.dart';
 import '../features/courses/presentation/pages/lesson_view_page.dart';
+import '../features/educator_studio/presentation/pages/educator_studio_page.dart';
+import '../features/problems/presentation/pages/custom_problem_workspace_page.dart';
 import '../features/profile/presentation/pages/edit_profile_page.dart';
 import '../features/profile/presentation/pages/profile_page.dart';
+import '../features/quizzes/presentation/pages/quiz_hub_page.dart';
+import '../features/quizzes/presentation/pages/quiz_leaderboard_page.dart';
+import '../features/quizzes/presentation/pages/quiz_play_page.dart';
 import '../features/splash/presentation/pages/splash_page.dart';
 import '../features/student_dashboard/presentation/pages/student_dashboard_page.dart';
 import '../features/teacher_dashboard/presentation/pages/teacher_dashboard_page.dart';
@@ -17,10 +24,8 @@ import '../features/teacher_onboarding/presentation/pages/become_educator_page.d
 import '../features/teachers/presentation/pages/teacher_catalog_page.dart';
 import '../features/teachers/presentation/pages/teacher_profile_page.dart';
 
-final appRouter = GoRouter(
-  initialLocation: AppRoutes.splash,
-
-  routes: [
+List<RouteBase> _buildRoutes() {
+  return [
     GoRoute(
       path: AppRoutes.splash,
       builder: (context, state) => const SplashPage(),
@@ -40,35 +45,18 @@ final appRouter = GoRouter(
       path: AppRoutes.verifyEmail,
       builder: (context, state) {
         final email = state.uri.queryParameters['email'] ?? '';
-
         return VerifyEmailPage(email: email);
       },
     ),
 
     GoRoute(
       path: AppRoutes.dashboard,
-      redirect: (context, state) async {
-        final role = await TokenStorage.getUserRole();
-        if (role == 'TEACHER') {
-          return AppRoutes.teacherDashboard;
-        } else if (role == 'ADMIN') {
-          return AppRoutes.admin;
-        }
-        return AppRoutes.studentDashboard;
-      },
+      builder: (context, state) => const StudentDashboardPage(),
     ),
 
     GoRoute(
       path: AppRoutes.home,
-      redirect: (context, state) async {
-        final role = await TokenStorage.getUserRole();
-        if (role == 'TEACHER') {
-          return AppRoutes.teacherDashboard;
-        } else if (role == 'ADMIN') {
-          return AppRoutes.admin;
-        }
-        return AppRoutes.studentDashboard;
-      },
+      builder: (context, state) => const StudentDashboardPage(),
     ),
 
     GoRoute(
@@ -84,6 +72,48 @@ final appRouter = GoRouter(
     GoRoute(
       path: AppRoutes.teacher,
       builder: (context, state) => const TeacherDashboardPage(),
+    ),
+
+    GoRoute(
+      path: AppRoutes.educatorStudio,
+      builder: (context, state) => const EducatorStudioPage(),
+    ),
+
+    GoRoute(
+      path: AppRoutes.quizzes,
+      builder: (context, state) => const QuizHubPage(),
+    ),
+
+    GoRoute(
+      path: '/quizzes/:id/play',
+      builder: (context, state) {
+        final quizId = state.pathParameters['id'] ?? '';
+        return QuizPlayPage(quizId: quizId);
+      },
+    ),
+
+    GoRoute(
+      path: '/quizzes/:id/leaderboard',
+      builder: (context, state) {
+        final quizId = state.pathParameters['id'] ?? '';
+        return QuizLeaderboardPage(quizId: quizId);
+      },
+    ),
+
+    GoRoute(
+      path: '/custom-problems/:id',
+      builder: (context, state) {
+        final problemId = state.pathParameters['id'] ?? '';
+        return CustomProblemWorkspacePage(problemId: problemId);
+      },
+    ),
+
+    GoRoute(
+      path: '/custom-problem/:id',
+      builder: (context, state) {
+        final problemId = state.pathParameters['id'] ?? '';
+        return CustomProblemWorkspacePage(problemId: problemId);
+      },
     ),
 
     GoRoute(
@@ -143,5 +173,70 @@ final appRouter = GoRouter(
         return LessonViewPage(courseSlug: slug, lessonSlug: lessonSlug);
       },
     ),
-  ],
+  ];
+}
+
+String? _handleRedirect(BuildContext context, GoRouterState state, AuthState authState) {
+  final loc = state.matchedLocation;
+
+  // Let splash screen perform its initial bootstrap
+  if (loc == AppRoutes.splash || authState.status == AuthStatus.initial) {
+    return null;
+  }
+
+  final isAuthRoute = loc == AppRoutes.login ||
+      loc == AppRoutes.register ||
+      loc == AppRoutes.verifyEmail;
+
+  // Unauthenticated user trying to access protected screen
+  if (!authState.isAuthenticated) {
+    if (!isAuthRoute) {
+      return AppRoutes.login;
+    }
+    return null;
+  }
+
+  // Authenticated user trying to access login / register
+  if (isAuthRoute) {
+    final role = (authState.role ?? 'STUDENT').toUpperCase();
+    if (role == 'TEACHER') {
+      return AppRoutes.teacherDashboard;
+    } else if (role == 'ADMIN') {
+      return AppRoutes.admin;
+    }
+    return AppRoutes.studentDashboard;
+  }
+
+  // Alias routes /dashboard and /home to specific role dashboards
+  if (loc == AppRoutes.dashboard || loc == AppRoutes.home) {
+    final role = (authState.role ?? 'STUDENT').toUpperCase();
+    if (role == 'TEACHER') {
+      return AppRoutes.teacherDashboard;
+    } else if (role == 'ADMIN') {
+      return AppRoutes.admin;
+    }
+    return AppRoutes.studentDashboard;
+  }
+
+  return null;
+}
+
+final appRouterProvider = Provider<GoRouter>((ref) {
+  final authListenable = ref.watch(authListenableProvider);
+
+  return GoRouter(
+    initialLocation: AppRoutes.splash,
+    refreshListenable: authListenable,
+    routes: _buildRoutes(),
+    redirect: (context, state) {
+      final authState = ref.read(authStateProvider);
+      return _handleRedirect(context, state, authState);
+    },
+  );
+});
+
+// Singleton fallback router instance
+final appRouter = GoRouter(
+  initialLocation: AppRoutes.splash,
+  routes: _buildRoutes(),
 );

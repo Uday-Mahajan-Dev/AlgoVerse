@@ -32,6 +32,19 @@ class ApiClient {
 
   static String get baseUrl => '$defaultBaseUrl/api/v1';
 
+  /// Global callback triggered on 401 Unauthorized / expired session.
+  static void Function()? onUnauthorizedSession;
+
+  static Future<Map<String, String>> _authHeaders({String? token}) async {
+    final effectiveToken = token ?? await TokenStorage.getAccessToken();
+    return {
+      if (effectiveToken != null && effectiveToken.isNotEmpty)
+        'Authorization': 'Bearer $effectiveToken',
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+  }
+
   static Future<Map<String, dynamic>> _handleResponse(
     http.Response response,
   ) async {
@@ -46,8 +59,15 @@ class ApiClient {
     }
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
+      if (response.statusCode == 401) {
+        onUnauthorizedSession?.call();
+        throw Exception('Session expired. Please log in again.');
+      }
+      final detail = body['detail']?.toString();
       throw Exception(
-        body['detail']?.toString() ?? 'Something went wrong. Please try again.',
+        detail != null && detail.isNotEmpty
+            ? detail
+            : 'Something went wrong. Please try again.',
       );
     }
 
@@ -71,6 +91,10 @@ class ApiClient {
     }
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
+      if (response.statusCode == 401) {
+        onUnauthorizedSession?.call();
+        throw Exception('Session expired. Please log in again.');
+      }
       throw Exception('Something went wrong. Please try again.');
     }
 
@@ -191,6 +215,26 @@ class ApiClient {
     }
 
     return _handleResponse(response);
+  }
+
+  // ============================================================
+  // LOGOUT
+  // ============================================================
+
+  static Future<Map<String, dynamic>> logout(String refreshToken) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/auth/logout'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'refresh_token': refreshToken}),
+          )
+          .timeout(const Duration(seconds: 4));
+
+      return _handleResponse(response);
+    } catch (_) {
+      return {'message': 'Logged out locally.'};
+    }
   }
 
   // ============================================================
@@ -999,19 +1043,335 @@ class ApiClient {
   }
 
   // ============================================================
-  // LOGOUT
+  // EDUCATOR STUDIO - CUSTOM PROBLEMS
   // ============================================================
 
-  static Future<void> logout(String refreshToken) async {
+  static Future<Map<String, dynamic>> createCustomProblem({
+    String? accessToken,
+    required String title,
+    required String description,
+    String? starterCode,
+    String? starterCodePython,
+    String? starterCodeJava,
+    String? starterCodeCpp,
+    required List<Map<String, dynamic>> testCases,
+    String visibility = 'CLASS_ONLY',
+  }) async {
+    final headers = await _authHeaders(token: accessToken);
     final response = await http
         .post(
-          Uri.parse('$baseUrl/auth/logout'),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({'refresh_token': refreshToken}),
+          Uri.parse('$baseUrl/teachers/custom-problems'),
+          headers: headers,
+          body: jsonEncode({
+            'title': title,
+            'description': description,
+            'starter_code': starterCode ?? starterCodePython ?? '',
+            'starter_code_python': starterCodePython ?? starterCode ?? '',
+            'starter_code_java': starterCodeJava ?? '',
+            'starter_code_cpp': starterCodeCpp ?? '',
+            'test_cases': testCases,
+            'visibility': visibility,
+          }),
         )
         .timeout(AppConstants.requestTimeout);
 
-    await _handleResponse(response);
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> generateStarterTemplates({
+    String? accessToken,
+    required String code,
+    String language = 'python',
+  }) async {
+    final headers = await _authHeaders(token: accessToken);
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/teachers/custom-problems/generate-templates'),
+          headers: headers,
+          body: jsonEncode({
+            'code': code,
+            'language': language,
+          }),
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<List<dynamic>> getTeacherCustomProblems({
+    String? accessToken,
+  }) async {
+    final headers = await _authHeaders(token: accessToken);
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/teachers/custom-problems'),
+          headers: headers,
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleListResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> getCustomProblemById({
+    String? accessToken,
+    required String problemId,
+  }) async {
+    final headers = await _authHeaders(token: accessToken);
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/teachers/custom-problems/$problemId'),
+          headers: headers,
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> getCustomProblemStats({
+    String? accessToken,
+    required String problemId,
+  }) async {
+    final headers = await _authHeaders(token: accessToken);
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/teachers/custom-problems/$problemId/stats'),
+          headers: headers,
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  // ============================================================
+  // KAHOOT-STYLE LIVE QUIZZES
+  // ============================================================
+
+  static Future<Map<String, dynamic>> createQuiz({
+    String? accessToken,
+    required String title,
+    String description = '',
+    String visibility = 'CLASS_ONLY',
+    int timePerQuestion = 30,
+    required List<Map<String, dynamic>> questions,
+  }) async {
+    final headers = await _authHeaders(token: accessToken);
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/quizzes'),
+          headers: headers,
+          body: jsonEncode({
+            'title': title,
+            'description': description,
+            'visibility': visibility,
+            'time_per_question_seconds': timePerQuestion,
+            'questions': questions,
+          }),
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<List<dynamic>> getTeacherQuizzes({
+    String? accessToken,
+  }) async {
+    final headers = await _authHeaders(token: accessToken);
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/quizzes/teacher'),
+          headers: headers,
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleListResponse(response);
+  }
+
+  static Future<List<dynamic>> getPublicQuizzes({
+    String? accessToken,
+  }) async {
+    final headers = await _authHeaders(token: accessToken);
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/quizzes/public'),
+          headers: headers,
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleListResponse(response);
+  }
+
+  static Future<List<dynamic>> getClassQuizzes({
+    String? accessToken,
+  }) async {
+    final headers = await _authHeaders(token: accessToken);
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/quizzes/class'),
+          headers: headers,
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleListResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> getQuizDetails({
+    String? accessToken,
+    required String quizId,
+    bool isPlaying = false,
+  }) async {
+    final headers = await _authHeaders(token: accessToken);
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/quizzes/$quizId?play=$isPlaying'),
+          headers: headers,
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> submitQuizAttempt({
+    String? accessToken,
+    required String quizId,
+    required List<Map<String, dynamic>> answers,
+  }) async {
+    final headers = await _authHeaders(token: accessToken);
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/quizzes/$quizId/submit'),
+          headers: headers,
+          body: jsonEncode({'answers': answers}),
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<List<dynamic>> getQuizLeaderboard({
+    String? accessToken,
+    required String quizId,
+  }) async {
+    final headers = await _authHeaders(token: accessToken);
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/quizzes/$quizId/leaderboard'),
+          headers: headers,
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleListResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> getQuizStats({
+    String? accessToken,
+    required String quizId,
+  }) async {
+    final headers = await _authHeaders(token: accessToken);
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/quizzes/$quizId/stats'),
+          headers: headers,
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  // ============================================================
+  // NOTIFICATIONS
+  // ============================================================
+
+  static Future<Map<String, dynamic>> getNotifications({
+    String? accessToken,
+    int limit = 50,
+  }) async {
+    final headers = await _authHeaders(token: accessToken);
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/notifications?limit=$limit'),
+          headers: headers,
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> markNotificationRead({
+    String? accessToken,
+    required String notificationId,
+  }) async {
+    final headers = await _authHeaders(token: accessToken);
+    final response = await http
+        .patch(
+          Uri.parse('$baseUrl/notifications/$notificationId/read'),
+          headers: headers,
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> markAllNotificationsRead({
+    String? accessToken,
+  }) async {
+    final headers = await _authHeaders(token: accessToken);
+    final response = await http
+        .patch(
+          Uri.parse('$baseUrl/notifications/read-all'),
+          headers: headers,
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  // ============================================================
+  // STUDENT MENTOR PROBLEMS & TEACHER PROFILE ASSETS
+  // ============================================================
+
+  static Future<List<dynamic>> getMentorCustomProblems({
+    String? accessToken,
+  }) async {
+    final headers = await _authHeaders(token: accessToken);
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/students/me/mentor-problems'),
+          headers: headers,
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleListResponse(response);
+  }
+
+  static Future<List<dynamic>> getTeacherPublishedCustomProblems({
+    String? accessToken,
+    required String teacherId,
+  }) async {
+    final headers = await _authHeaders(token: accessToken);
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/teachers/$teacherId/custom-problems'),
+          headers: headers,
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleListResponse(response);
+  }
+
+  static Future<List<dynamic>> getTeacherPublishedQuizzes({
+    String? accessToken,
+    required String teacherId,
+  }) async {
+    final headers = await _authHeaders(token: accessToken);
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/teachers/$teacherId/quizzes'),
+          headers: headers,
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleListResponse(response);
   }
 }
+
 

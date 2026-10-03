@@ -1,7 +1,7 @@
 from collections.abc import Generator
 from uuid import UUID
 
-from fastapi import Depends
+from fastapi import Depends, HTTPException
 # from fastapi.security import OAuth2PasswordBearer
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.core.enums import UserRole
 from app.core.security import decode_token
 from app.db.session import SessionLocal
-from app.exceptions.auth import InvalidCredentialsException
+from app.exceptions.auth import InvalidCredentialsException, NotAuthenticatedException
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
 
@@ -38,20 +38,20 @@ def get_current_user(
     payload = decode_token(token)
 
     if not payload:
-        raise InvalidCredentialsException()
+        raise NotAuthenticatedException()
 
     if payload.get("type") != "access":
-        raise InvalidCredentialsException()
+        raise NotAuthenticatedException()
 
     user_id = payload.get("sub")
 
     if not user_id:
-        raise InvalidCredentialsException()
+        raise NotAuthenticatedException()
 
     try:
         user_uuid = UUID(str(user_id))
     except ValueError:
-        raise InvalidCredentialsException()
+        raise NotAuthenticatedException()
 
     user = UserRepository.get_by_id(
         db=db,
@@ -59,10 +59,10 @@ def get_current_user(
     )
 
     if user is None:
-        raise InvalidCredentialsException()
+        raise NotAuthenticatedException()
 
     if not user.is_active:
-        raise InvalidCredentialsException()
+        raise NotAuthenticatedException("Account is inactive or disabled.")
 
     return user
 
@@ -108,7 +108,10 @@ def require_role(role: UserRole):
     ) -> User:
 
         if current_user.role.name != role.value:
-            raise InvalidCredentialsException()
+            raise HTTPException(
+                status_code=403,
+                detail=f"Forbidden: {role.value} role required.",
+            )
 
         return current_user
 
@@ -121,7 +124,10 @@ def require_roles(*roles: UserRole):
     ) -> User:
         allowed_roles = {r.value for r in roles}
         if current_user.role.name not in allowed_roles:
-            raise InvalidCredentialsException()
+            raise HTTPException(
+                status_code=403,
+                detail="Forbidden: You do not have permission to access this resource.",
+            )
 
         return current_user
 

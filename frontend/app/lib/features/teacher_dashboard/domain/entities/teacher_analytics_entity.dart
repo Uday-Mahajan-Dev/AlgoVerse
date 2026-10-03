@@ -132,11 +132,15 @@ class AssignmentEntity {
   final String teacherName;
   final String studentId;
   final String studentName;
-  final String lessonId;
-  final String lessonSlug;
-  final String lessonTitle;
-  final String courseTitle;
-  final String courseSlug;
+  final String assignmentType; // "LESSON", "CUSTOM_PROBLEM", "QUIZ"
+  final String? lessonId;
+  final String? lessonSlug;
+  final String? lessonTitle;
+  final String? courseTitle;
+  final String? courseSlug;
+  final String? customProblemId;
+  final String? quizId;
+  final String title;
   final DateTime assignedAt;
   final DateTime? dueDate;
   final String status; // "pending", "completed", "overdue"
@@ -149,11 +153,15 @@ class AssignmentEntity {
     required this.teacherName,
     required this.studentId,
     required this.studentName,
-    required this.lessonId,
-    required this.lessonSlug,
-    required this.lessonTitle,
-    required this.courseTitle,
-    required this.courseSlug,
+    this.assignmentType = 'LESSON',
+    this.lessonId,
+    this.lessonSlug,
+    this.lessonTitle,
+    this.courseTitle,
+    this.courseSlug,
+    this.customProblemId,
+    this.quizId,
+    this.title = '',
     required this.assignedAt,
     this.dueDate,
     required this.status,

@@ -30,21 +30,8 @@ class TeacherService:
 
     @staticmethod
     def _generate_unique_class_code(db: Session, institution_name: str | None = None) -> str:
-        prefix = "ALG"
-        if institution_name:
-            clean = "".join([c for c in institution_name if c.isalnum()]).upper()
-            if len(clean) >= 3:
-                prefix = clean[:3]
-
-        for _ in range(30):
-            digits = "".join(random.choices(string.digits, k=3))
-            code = f"{prefix}-{digits}"
-            existing = db.scalar(select(TeacherProfile).where(TeacherProfile.class_code == code))
-            if not existing:
-                return code
-
         while True:
-            code = f"{prefix}-" + "".join(random.choices(string.ascii_uppercase + string.digits, k=4))
+            code = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
             existing = db.scalar(select(TeacherProfile).where(TeacherProfile.class_code == code))
             if not existing:
                 return code
@@ -182,12 +169,16 @@ class TeacherService:
             email=teacher.email,
             avatar_url=teacher.avatar_url,
             bio=profile.bio if profile and profile.bio else teacher.bio,
+            professional_bio=profile.bio if profile and profile.bio else teacher.bio,
             country=teacher.country,
             student_count=student_count,
             specialty=specialty,
             institution_name=profile.institution_name if profile else None,
             designation=profile.designation if profile else None,
+            subject_expertise=profile.subject_expertise if profile else None,
             class_code=profile.class_code if profile else None,
+            instagram_url=teacher.instagram_url,
+            linkedin_url=teacher.linkedin_url,
             created_at=teacher.created_at,
         )
 
