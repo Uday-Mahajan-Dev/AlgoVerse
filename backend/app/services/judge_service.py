@@ -2,12 +2,14 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.assignment import Assignment
 from app.models.custom_problem import CustomProblem
+from app.models.custom_problem_completion import CustomProblemCompletion
 from app.models.lesson import Lesson
+from app.models.lesson_completion import LessonCompletion
 from app.models.problem import Problem
 from app.models.submission import Submission
 from app.models.test_case import TestCase
@@ -118,7 +120,7 @@ class JudgeService:
         if not problem and not custom_problem:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Problem with ID '{problem_id}' not found.",
+                detail="Custom problem not found" if not problem else f"Problem with ID '{problem_id}' not found.",
             )
 
         public_tcs = []
@@ -134,17 +136,29 @@ class JudgeService:
             time_limit_ms = problem.time_limit_ms
             memory_limit_mb = problem.memory_limit_mb
         elif custom_problem:
-            raw_tcs = custom_problem.test_cases or []
+            raw_tcs = custom_problem.test_cases or getattr(custom_problem, 'test_cases_json', None) or []
             public_tcs = [
-                {"input": tc.get("input", ""), "expected": tc.get("expected", "")}
+                {
+                    "input": tc.get("input", "") if isinstance(tc, dict) else getattr(tc, "stdin_input", ""),
+                    "expected": tc.get("expected", "") if isinstance(tc, dict) else getattr(tc, "expected_stdout", ""),
+                }
                 for tc in raw_tcs
-                if not tc.get("is_hidden", False)
+                if not (tc.get("is_hidden", False) if isinstance(tc, dict) else getattr(tc, "is_hidden", False))
             ]
+            # Fallback: if all test cases were marked hidden or none were flagged public, allow all for trial
+            if not public_tcs and raw_tcs:
+                public_tcs = [
+                    {
+                        "input": tc.get("input", "") if isinstance(tc, dict) else getattr(tc, "stdin_input", ""),
+                        "expected": tc.get("expected", "") if isinstance(tc, dict) else getattr(tc, "expected_stdout", ""),
+                    }
+                    for tc in raw_tcs
+                ]
 
         if not public_tcs:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Problem has no public test cases configured.",
+                detail="No test cases are defined for this custom problem." if custom_problem else "Problem has no public test cases configured.",
             )
 
         executor = get_executor()
@@ -287,7 +301,7 @@ class JudgeService:
         if not problem and not custom_problem:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Problem with ID '{problem_id}' not found.",
+                detail="Custom problem not found" if not problem else f"Problem with ID '{problem_id}' not found.",
             )
 
         all_tcs = []
@@ -302,16 +316,20 @@ class JudgeService:
             time_limit_ms = problem.time_limit_ms
             memory_limit_mb = problem.memory_limit_mb
         elif custom_problem:
-            raw_tcs = custom_problem.test_cases or []
+            raw_tcs = custom_problem.test_cases or getattr(custom_problem, 'test_cases_json', None) or []
             all_tcs = [
-                {"input": tc.get("input", ""), "expected": tc.get("expected", ""), "is_hidden": tc.get("is_hidden", False)}
+                {
+                    "input": tc.get("input", "") if isinstance(tc, dict) else getattr(tc, "stdin_input", ""),
+                    "expected": tc.get("expected", "") if isinstance(tc, dict) else getattr(tc, "expected_stdout", ""),
+                    "is_hidden": tc.get("is_hidden", False) if isinstance(tc, dict) else getattr(tc, "is_hidden", False),
+                }
                 for tc in raw_tcs
             ]
 
         if not all_tcs:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Problem has no test cases configured.",
+                detail="No test cases are defined for this custom problem." if custom_problem else "Problem has no test cases configured.",
             )
 
         executor = get_executor()
@@ -370,8 +388,13 @@ class JudgeService:
                 actual_output = clean_actual if not is_hidden else None
                 break
 
-        # If standard problem, save submission record
+        # Handle post-submission actions based on problem type
+        is_lesson_completed = False
         sub_id = None
+        xp_awarded = 0
+        already_completed = False
+        is_first_ac = False
+
         if problem:
             submission = Submission(
                 student_id=student_id,
@@ -400,12 +423,74 @@ class JudgeService:
                     student_id=student_id,
                     lesson_id=problem.lesson_id,
                 )
+                is_lesson_completed = True
+
                 from app.services.badge_service import BadgeService
                 BadgeService.award_badge_if_eligible(db, student_id, "FIRST_PROBLEM_SOLVED")
 
+                # Check if solved in 2+ distinct languages
+                distinct_langs = db.scalars(
+                    select(Submission.language)
+                    .where(
+                        Submission.student_id == student_id,
+                        Submission.verdict == "AC",
+                    )
+                    .distinct()
+                ).all()
+                if len(set(distinct_langs)) >= 2:
+                    BadgeService.award_badge_if_eligible(db, student_id, "MULTILANG_CODER")
+
         elif custom_problem:
-            from uuid import uuid4
-            sub_id = uuid4()
+            existing_completion = db.scalar(
+                select(CustomProblemCompletion).where(
+                    CustomProblemCompletion.student_id == student_id,
+                    CustomProblemCompletion.custom_problem_id == custom_problem.id,
+                )
+            )
+
+            if existing_completion:
+                already_completed = True
+
+            completion_to_add = None
+            if final_verdict == "AC":
+                if not existing_completion:
+                    is_first_ac = True
+                    xp_awarded = 50
+                    completion_to_add = CustomProblemCompletion(
+                        student_id=student_id,
+                        custom_problem_id=custom_problem.id,
+                        xp_awarded=xp_awarded,
+                        completed_at=datetime.now(timezone.utc),
+                    )
+                    db.add(completion_to_add)
+                    db.flush()
+
+            submission = Submission(
+                student_id=student_id,
+                problem_id=custom_problem.id,
+                code=code,
+                language=language.lower(),
+                verdict=final_verdict,
+                execution_time_ms=total_time_ms,
+                memory_used_kb=max_memory_kb,
+                passed_count=passed_count,
+                total_count=len(all_tcs),
+                failed_test_index=failed_test_index,
+                actual_output=actual_output,
+                error_message=error_message,
+                is_first_ac=is_first_ac,
+                xp_awarded=xp_awarded,
+                created_at=datetime.now(timezone.utc),
+            )
+            db.add(submission)
+            db.commit()
+            db.refresh(submission)
+            sub_id = submission.id
+
+            if is_first_ac and completion_to_add:
+                completion_to_add.first_ac_submission_id = submission.id
+                db.commit()
+
             if final_verdict == "AC":
                 # Mark pending assignments as completed
                 assignments = db.scalars(
@@ -426,109 +511,14 @@ class JudgeService:
                 from app.services.badge_service import BadgeService
                 BadgeService.award_badge_if_eligible(db, student_id, "FIRST_PROBLEM_SOLVED")
 
-        all_tcs = list(problem.test_cases)
-        if not all_tcs:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Problem has no test cases configured.",
-            )
-
-        executor = get_executor()
-        passed_count = 0
-        total_time_ms = 0
-        max_memory_kb = 0
-        final_verdict = "AC"
-        failed_test_index = None
-        error_message = None
-        actual_output = None
-
-        for idx, tc in enumerate(all_tcs, start=1):
-            exec_res = executor.execute(
-                source_code=code,
-                language=language,
-                stdin_input=tc.stdin_input,
-                time_limit_ms=problem.time_limit_ms,
-                memory_limit_mb=problem.memory_limit_mb,
-            )
-
-            total_time_ms += exec_res.execution_time_ms
-            max_memory_kb = max(max_memory_kb, exec_res.memory_used_kb)
-
-            if exec_res.compile_error:
-                final_verdict = "CE"
-                failed_test_index = idx
-                error_message = exec_res.stderr
-                break
-
-            if exec_res.timed_out:
-                final_verdict = "TLE"
-                failed_test_index = idx
-                error_message = "Time Limit Exceeded"
-                break
-
-            if exec_res.exit_code != 0:
-                final_verdict = "RE"
-                failed_test_index = idx
-                error_message = exec_res.stderr or "Runtime Error"
-                actual_output = exec_res.stdout if not tc.is_hidden else None
-                break
-
-            clean_actual = exec_res.stdout.strip()
-            clean_expected = tc.expected_stdout.strip()
-
-            if clean_actual == clean_expected:
-                passed_count += 1
-            else:
-                final_verdict = "WA"
-                failed_test_index = idx
-                error_message = "Wrong Answer"
-                actual_output = clean_actual if not tc.is_hidden else None
-                break
-
-        # Save Submission record
-        submission = Submission(
-            student_id=student_id,
-            problem_id=problem.id,
-            code=code,
-            language=language.lower(),
-            verdict=final_verdict,
-            execution_time_ms=total_time_ms,
-            memory_used_kb=max_memory_kb,
-            passed_count=passed_count,
-            total_count=len(all_tcs),
-            failed_test_index=failed_test_index,
-            actual_output=actual_output,
-            error_message=error_message,
-            created_at=datetime.now(timezone.utc),
-        )
-        db.add(submission)
-        db.commit()
-        db.refresh(submission)
-
-        # If AC -> Auto-complete lesson and award badges!
-        is_lesson_completed = False
-        if final_verdict == "AC":
-            CourseService.complete_lesson(
-                db=db,
-                student_id=student_id,
-                lesson_id=problem.lesson_id,
-            )
-            is_lesson_completed = True
-
-            from app.services.badge_service import BadgeService
-            BadgeService.award_badge_if_eligible(db, student_id, "FIRST_PROBLEM_SOLVED")
-
-            # Check if solved in 2+ distinct languages
-            distinct_langs = db.scalars(
-                select(Submission.language)
-                .where(
-                    Submission.student_id == student_id,
-                    Submission.verdict == "AC",
-                )
-                .distinct()
-            ).all()
-            if len(set(distinct_langs)) >= 2:
-                BadgeService.award_badge_if_eligible(db, student_id, "MULTILANG_CODER")
+        # Compute dynamic student total XP
+        lesson_count = db.scalar(
+            select(func.count(LessonCompletion.id)).where(LessonCompletion.student_id == student_id)
+        ) or 0
+        custom_xp = db.scalar(
+            select(func.sum(CustomProblemCompletion.xp_awarded)).where(CustomProblemCompletion.student_id == student_id)
+        ) or 0
+        total_xp = (lesson_count * 50) + int(custom_xp)
 
         message = (
             "Accepted! All test cases passed."
@@ -537,15 +527,20 @@ class JudgeService:
         )
 
         return SubmissionResultResponse(
-            submission_id=submission.id,
+            submission_id=sub_id,
             verdict=final_verdict,
             passed_count=passed_count,
             total_count=len(all_tcs),
             execution_time_ms=total_time_ms,
+            runtime_ms=total_time_ms,
             memory_used_kb=max_memory_kb,
             failed_test_index=failed_test_index,
             message=message,
             is_lesson_completed=is_lesson_completed,
+            xp_awarded=xp_awarded,
+            already_completed=already_completed,
+            is_first_ac=is_first_ac,
+            total_xp=total_xp,
         )
 
     @staticmethod

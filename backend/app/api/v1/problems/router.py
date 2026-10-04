@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
 from app.models.user import User
+from app.schemas.custom_problem import CustomProblemCreate, CustomProblemResponse
 from app.schemas.problem import (
     CodeExecutionRequest,
     ProblemDetailResponse,
@@ -14,9 +15,43 @@ from app.schemas.problem import (
     TrialResultResponse,
 )
 from app.services.code_execution.executor_factory import get_executor_status
+from app.services.custom_problem_service import CustomProblemService
 from app.services.judge_service import JudgeService
 
 router = APIRouter()
+
+
+@router.post("/custom", response_model=CustomProblemResponse, status_code=status.HTTP_201_CREATED)
+def create_custom_problem(
+    request: CustomProblemCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Create a new custom algorithmic problem with test cases.
+    """
+    return CustomProblemService.create_custom_problem(
+        db=db,
+        teacher_id=current_user.id,
+        data=request,
+    )
+
+
+@router.get("/custom/{problem_id}", response_model=CustomProblemResponse)
+def get_custom_problem(
+    problem_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Fetch custom problem details and test cases.
+    """
+    return CustomProblemService.get_custom_problem_by_id(
+        db=db,
+        problem_id=problem_id,
+        user_id=current_user.id,
+    )
+
 
 
 @router.get("/executor-status")

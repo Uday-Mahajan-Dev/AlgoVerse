@@ -1,9 +1,9 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
 from app.db.base_class import Base
 
@@ -26,7 +26,6 @@ class Submission(Base):
 
     problem_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("problems.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -83,6 +82,18 @@ class Submission(Base):
         nullable=True,
     )
 
+    is_first_ac: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+    )
+
+    xp_awarded: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        nullable=False,
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -96,6 +107,6 @@ class Submission(Base):
 
     problem = relationship(
         "Problem",
+        primaryjoin="foreign(Submission.problem_id) == Problem.id",
         back_populates="submissions",
-        foreign_keys=[problem_id],
     )

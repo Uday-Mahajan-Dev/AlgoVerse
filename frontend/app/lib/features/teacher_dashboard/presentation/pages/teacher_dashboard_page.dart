@@ -2196,7 +2196,324 @@ class _ProblemStatsSheetState extends State<_ProblemStatsSheet> {
               );
             },
           ),
+
+        const SizedBox(height: 24),
+        Text(
+          'Student Submissions (${((stats['submissions'] as List?) ?? []).length})',
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF0F172A),
+          ),
+        ),
+        const SizedBox(height: 10),
+
+        if (((stats['submissions'] as List?) ?? []).isEmpty)
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Center(
+              child: Text(
+                'No student code submissions recorded yet.',
+                style: TextStyle(color: Colors.grey.shade500),
+              ),
+            ),
+          )
+        else
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: ((stats['submissions'] as List?) ?? []).length,
+            separatorBuilder: (ctx, i) => const SizedBox(height: 8),
+            itemBuilder: (ctx, i) {
+              final sub = (stats['submissions'] as List)[i];
+              final studentName = sub['student_name']?.toString() ?? 'Student';
+              final studentEmail = sub['student_email']?.toString() ?? '';
+              final verdict = (sub['verdict']?.toString() ?? 'PENDING').toUpperCase();
+              final lang = (sub['language']?.toString() ?? 'python').toUpperCase();
+              final runtimeMs = sub['runtime_ms'];
+              final code = sub['code']?.toString() ?? '';
+              final createdAtStr = sub['created_at']?.toString();
+              DateTime? createdAt;
+              if (createdAtStr != null) {
+                createdAt = DateTime.tryParse(createdAtStr);
+              }
+              final isAC = verdict == 'AC' || verdict == 'ACCEPTED';
+
+              return Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    CircleAvatar(
+                      radius: 16,
+                      backgroundColor: isAC ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2),
+                      child: Icon(
+                        isAC ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                        size: 18,
+                        color: isAC ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  studentName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: isAC ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  verdict,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: isAC ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFEDE9FE),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  lang,
+                                  style: const TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF7C3AED),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Row(
+                            children: [
+                              if (studentEmail.isNotEmpty) ...[
+                                Flexible(
+                                  child: Text(
+                                    studentEmail,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                              ],
+                              if (runtimeMs != null) ...[
+                                Text(
+                                  '${runtimeMs}ms',
+                                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
+                                ),
+                                const SizedBox(width: 8),
+                              ],
+                              if (createdAt != null)
+                                Text(
+                                  '${createdAt.hour.toString().padLeft(2, '0')}:${createdAt.minute.toString().padLeft(2, '0')}',
+                                  style: TextStyle(fontSize: 10, color: Colors.grey.shade400),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton.tonalIcon(
+                      onPressed: () => _showCodeViewerModal(
+                        context,
+                        studentName: studentName,
+                        verdict: verdict,
+                        language: lang,
+                        code: code,
+                        runtimeMs: runtimeMs?.toString(),
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF0F172A),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      icon: const Icon(Icons.code_rounded, size: 14),
+                      label: const Text('View Code', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
       ],
+    );
+  }
+
+  void _showCodeViewerModal(
+    BuildContext context, {
+    required String studentName,
+    required String verdict,
+    required String language,
+    required String code,
+    String? runtimeMs,
+  }) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        final isAC = verdict == 'AC' || verdict == 'ACCEPTED';
+        return Dialog(
+          backgroundColor: const Color(0xFF0F172A),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          insetPadding: const EdgeInsets.all(16),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 700, maxHeight: 650),
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.code_rounded, color: Colors.cyanAccent, size: 20),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Submission by $studentName',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: isAC
+                                      ? const Color(0x4D16A34A)
+                                      : const Color(0x4DDC2626),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(
+                                    color: isAC ? const Color(0xFF22C55E) : const Color(0xFFEF4444),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Text(
+                                  verdict,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: isAC ? const Color(0xFF4ADE80) : const Color(0xFFF87171),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                language,
+                                style: const TextStyle(color: Colors.grey, fontSize: 12),
+                              ),
+                              if (runtimeMs != null) ...[
+                                const SizedBox(width: 6),
+                                Text(
+                                  '• ${runtimeMs}ms',
+                                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.copy_rounded, color: Colors.white70, size: 18),
+                      tooltip: 'Copy Code',
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: code));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Code copied to clipboard'),
+                            duration: Duration(seconds: 2),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      },
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                      onPressed: () => Navigator.of(ctx).pop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                const Divider(color: Color(0xFF334155), height: 1),
+                const SizedBox(height: 14),
+                Expanded(
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF030712),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFF1E293B)),
+                    ),
+                    child: SingleChildScrollView(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: SelectableText(
+                          code.isEmpty ? '// No code recorded for this attempt' : code,
+                          style: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 13,
+                            color: Color(0xFFE2E8F0),
+                            height: 1.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

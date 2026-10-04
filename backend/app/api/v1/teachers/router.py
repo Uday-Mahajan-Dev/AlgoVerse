@@ -31,6 +31,8 @@ from app.schemas.teachers import (
     TeacherProfileResponse,
     TeacherSelectionResponse,
 )
+from app.schemas.quiz import QuizStatsResponse
+from app.services.quiz_service import QuizService
 from app.services.teacher_analytics_service import TeacherAnalyticsService
 from app.services.teacher_service import TeacherService
 
@@ -217,6 +219,7 @@ from app.schemas.custom_problem import (
     CustomProblemCreate,
     CustomProblemResponse,
     CustomProblemStatsResponse,
+    CustomProblemSubmissionsResponse,
     GenerateTemplatesRequest,
     GenerateTemplatesResponse,
 )
@@ -310,6 +313,40 @@ def get_custom_problem_stats(
     return CustomProblemService.get_custom_problem_stats(
         db=db,
         problem_id=problem_id,
+        teacher_id=current_teacher.id,
+    )
+
+
+@router.get(
+    "/custom-problems/{problem_id}/submissions",
+    response_model=CustomProblemSubmissionsResponse,
+    summary="Get detailed submission history with student code for a custom problem (Teacher only)",
+)
+def get_custom_problem_submissions(
+    problem_id: UUID,
+    current_teacher: User = Depends(get_current_teacher),
+    db: Session = Depends(get_db),
+):
+    return CustomProblemService.get_custom_problem_submissions(
+        db=db,
+        problem_id=problem_id,
+        teacher_id=current_teacher.id,
+    )
+
+
+@router.get(
+    "/quizzes/{quiz_id}/stats",
+    response_model=QuizStatsResponse,
+    summary="Get global and class statistics for a quiz (Teacher only)",
+)
+def get_teacher_quiz_stats(
+    quiz_id: UUID,
+    current_teacher: User = Depends(get_current_teacher),
+    db: Session = Depends(get_db),
+):
+    return QuizService.get_quiz_stats(
+        db=db,
+        quiz_id=quiz_id,
         teacher_id=current_teacher.id,
     )
 

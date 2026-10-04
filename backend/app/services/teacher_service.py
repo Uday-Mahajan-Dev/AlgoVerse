@@ -30,8 +30,17 @@ class TeacherService:
 
     @staticmethod
     def _generate_unique_class_code(db: Session, institution_name: str | None = None) -> str:
+        prefix = ""
+        if institution_name:
+            clean_inst = "".join(c for c in institution_name if c.isalnum()).upper()
+            if len(clean_inst) >= 3:
+                prefix = clean_inst[:3] + "-"
+            elif clean_inst:
+                prefix = clean_inst + "-"
+
         while True:
-            code = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
+            suffix = "".join(random.choices(string.ascii_uppercase + string.digits, k=4))
+            code = f"{prefix}{suffix}" if prefix else "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
             existing = db.scalar(select(TeacherProfile).where(TeacherProfile.class_code == code))
             if not existing:
                 return code

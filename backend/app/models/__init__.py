@@ -24,3 +24,4 @@ from .quiz import Quiz
 from .quiz_question import QuizQuestion
 from .quiz_attempt import QuizAttempt
 from .notification import Notification
+from .custom_problem_completion import CustomProblemCompletion

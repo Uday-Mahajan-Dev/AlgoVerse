@@ -3,7 +3,7 @@ from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
 from app.db.base_class import Base
 
@@ -109,6 +109,7 @@ class Problem(Base):
 
     submissions = relationship(
         "Submission",
+        primaryjoin="Problem.id == foreign(Submission.problem_id)",
         back_populates="problem",
         cascade="all, delete-orphan",
     )

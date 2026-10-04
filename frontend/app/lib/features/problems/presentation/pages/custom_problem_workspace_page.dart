@@ -155,14 +155,45 @@ class _CustomProblemWorkspacePageState
 
       if (mounted) {
         final verdict = res['verdict']?.toString() ?? 'AC';
-        setState(() {
-          _executionResult = res;
-          _verdict = verdict;
-          _isSubmitting = false;
-        });
+        final isFirstAc = res['is_first_ac'] == true;
+        final xpAwarded = (res['xp_awarded'] as num?)?.toInt() ?? (isFirstAc ? 50 : 0);
+        final alreadyCompleted = res['already_completed'] == true;
 
         if (verdict == 'AC') {
-          _showAcceptedDialog();
+          if (isFirstAc && xpAwarded > 0) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Row(
+                  children: [
+                    const Icon(Icons.stars_rounded, color: Colors.amber, size: 24),
+                    const SizedBox(width: 8),
+                    Text(
+                      '+$xpAwarded XP Earned! 🎉',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                  ],
+                ),
+                backgroundColor: const Color(0xFF1E293B),
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                duration: const Duration(seconds: 4),
+              ),
+            );
+            _showAcceptedDialog(
+              title: 'Accepted! 🎉 +$xpAwarded XP',
+              message: 'Congratulations! Your solution passed all test cases. You earned +$xpAwarded XP and completed this mentor challenge!',
+            );
+          } else if (alreadyCompleted) {
+            _showAcceptedDialog(
+              title: 'Accepted! 🎉 (Practice)',
+              message: 'Great job! Your practice solution passed all test cases. Your attempt has been recorded.',
+            );
+          } else {
+            _showAcceptedDialog(
+              title: 'Accepted! 🎉',
+              message: 'Congratulations! Your solution passed all test cases.',
+            );
+          }
         }
       }
     } catch (e) {
@@ -176,7 +207,7 @@ class _CustomProblemWorkspacePageState
     }
   }
 
-  void _showAcceptedDialog() {
+  void _showAcceptedDialog({required String title, required String message}) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -192,12 +223,17 @@ class _CustomProblemWorkspacePageState
               child: const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 28),
             ),
             const SizedBox(width: 12),
-            const Text('Accepted! 🎉', style: TextStyle(fontWeight: FontWeight.bold)),
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+            ),
           ],
         ),
-        content: const Text(
-          'Congratulations! Your solution passed all test cases. Your homework progress has been marked as complete.',
-          style: TextStyle(height: 1.4),
+        content: Text(
+          message,
+          style: const TextStyle(height: 1.4),
         ),
         actions: [
           FilledButton(
@@ -456,37 +492,88 @@ class _CustomProblemWorkspacePageState
       children: [
         // Editor Action Header
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           color: const Color(0xFF1E293B),
           child: Row(
             children: [
               const Icon(Icons.code_rounded, color: Colors.white70, size: 18),
-              const SizedBox(width: 8),
-              const Text('Source Code', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold, fontSize: 13)),
-              const Spacer(),
-              OutlinedButton.icon(
-                onPressed: _isRunning || _isSubmitting ? null : _runCode,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.amber,
-                  side: const BorderSide(color: Colors.amber),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              const SizedBox(width: 6),
+              const Text(
+                'Code',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
                 ),
-                icon: _isRunning
-                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.amber))
-                    : const Icon(Icons.play_arrow_rounded, size: 18),
-                label: const Text('Run Code', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
-              const SizedBox(width: 10),
-              FilledButton.icon(
-                onPressed: _isRunning || _isSubmitting ? null : _submitSolution,
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF10B981),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              const Spacer(),
+              Flexible(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        height: 34.0,
+                        child: OutlinedButton.icon(
+                          onPressed: _isRunning || _isSubmitting ? null : _runCode,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.amber,
+                            side: const BorderSide(color: Colors.amber),
+                            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          icon: _isRunning
+                              ? const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.amber,
+                                  ),
+                                )
+                              : const Icon(Icons.play_arrow_rounded, size: 16),
+                          label: const Text(
+                            'Run',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        height: 34.0,
+                        child: FilledButton.icon(
+                          onPressed: _isRunning || _isSubmitting ? null : _submitSolution,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF10B981),
+                            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          icon: _isSubmitting
+                              ? const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.cloud_upload_rounded, size: 16),
+                          label: const Text(
+                            'Submit',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                icon: _isSubmitting
-                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Icon(Icons.cloud_upload_rounded, size: 18),
-                label: const Text('Submit', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ],
           ),

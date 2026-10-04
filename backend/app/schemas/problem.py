@@ -61,10 +61,15 @@ class SubmissionResultResponse(BaseModel):
     passed_count: int
     total_count: int
     execution_time_ms: int | None = None
+    runtime_ms: int | None = None
     memory_used_kb: int | None = None
     failed_test_index: int | None = None
     message: str
     is_lesson_completed: bool = False
+    xp_awarded: int = 0
+    already_completed: bool = False
+    is_first_ac: bool = False
+    total_xp: int = 0
 
 
 class SubmissionSummaryResponse(BaseModel):

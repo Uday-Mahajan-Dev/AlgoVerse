@@ -8,6 +8,7 @@ from app.core.enums import UserRole
 from app.models.course import Course
 from app.models.course_enrollment import CourseEnrollment
 from app.models.course_module import CourseModule
+from app.models.custom_problem_completion import CustomProblemCompletion
 from app.models.lesson import Lesson
 from app.models.lesson_completion import LessonCompletion
 from app.models.role import Role
@@ -280,7 +281,7 @@ class DashboardService:
         )
 
         # 4. Total problems solved
-        total_problems = (
+        course_problems = (
             db.scalar(
                 select(func.count(LessonCompletion.id))
                 .join(Lesson, LessonCompletion.lesson_id == Lesson.id)
@@ -291,6 +292,15 @@ class DashboardService:
             )
             or 0
         )
+        custom_problems = (
+            db.scalar(
+                select(func.count(CustomProblemCompletion.id)).where(
+                    CustomProblemCompletion.student_id == student_id
+                )
+            )
+            or 0
+        )
+        total_problems = course_problems + custom_problems
 
         # 5. Streak calculation
         # TODO: use student timezone from profile when available
@@ -360,7 +370,15 @@ class DashboardService:
         )
 
         # Dynamic XP & Level calculation
-        total_xp = metrics.total_lessons_completed * 50
+        custom_xp = (
+            db.scalar(
+                select(func.sum(CustomProblemCompletion.xp_awarded)).where(
+                    CustomProblemCompletion.student_id == user.id
+                )
+            )
+            or 0
+        )
+        total_xp = (metrics.total_lessons_completed * 50) + int(custom_xp)
         current_level = max(1, (total_xp // 250) + 1)
         level_base_xp = (current_level - 1) * 250
         next_level_xp = current_level * 250

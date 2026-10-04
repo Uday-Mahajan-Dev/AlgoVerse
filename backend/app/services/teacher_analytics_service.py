@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import desc, func, select
+from sqlalchemy import desc, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.assignment import Assignment
@@ -125,14 +125,6 @@ class TeacherAnalyticsService:
         """Overview KPI cards and recent student activity feed for teacher."""
         students = cls._get_teacher_students(db, teacher_id)
         total_students = len(students)
-        if total_students == 0:
-            return TeacherOverviewResponse(
-                total_students=0,
-                active_students=0,
-                avg_course_completion=0.0,
-                total_submissions_today=0,
-                recent_activity_feed=[],
-            )
 
         student_ids = [s.id for s in students]
         student_map = {s.id: s for s in students}
@@ -140,74 +132,91 @@ class TeacherAnalyticsService:
         seven_days_ago = now_utc - timedelta(days=7)
         today_date = now_utc.date()
 
+        teacher_problem_ids = list(
+            db.scalars(
+                select(CustomProblem.id).where(CustomProblem.teacher_id == teacher_id)
+            ).all()
+        )
+
         # 1. Active students count (completion or submission or access within 7 days)
-        active_completers = set(
-            db.execute(
-                select(LessonCompletion.student_id)
-                .where(
-                    LessonCompletion.student_id.in_(student_ids),
-                    LessonCompletion.completed_at >= seven_days_ago,
-                )
-                .distinct()
-            ).scalars().all()
-        )
+        active_students_count = 0
+        if student_ids:
+            active_completers = set(
+                db.execute(
+                    select(LessonCompletion.student_id)
+                    .where(
+                        LessonCompletion.student_id.in_(student_ids),
+                        LessonCompletion.completed_at >= seven_days_ago,
+                    )
+                    .distinct()
+                ).scalars().all()
+            )
 
-        active_submitters = set(
-            db.execute(
-                select(Submission.student_id)
-                .where(
-                    Submission.student_id.in_(student_ids),
-                    Submission.created_at >= seven_days_ago,
-                )
-                .distinct()
-            ).scalars().all()
-        )
+            active_submitters = set(
+                db.execute(
+                    select(Submission.student_id)
+                    .where(
+                        Submission.student_id.in_(student_ids),
+                        Submission.created_at >= seven_days_ago,
+                    )
+                    .distinct()
+                ).scalars().all()
+            )
 
-        active_accessers = set(
-            db.execute(
-                select(StudentLessonActivity.student_id)
-                .where(
-                    StudentLessonActivity.student_id.in_(student_ids),
-                    StudentLessonActivity.last_accessed_at >= seven_days_ago,
-                )
-                .distinct()
-            ).scalars().all()
-        )
+            active_accessers = set(
+                db.execute(
+                    select(StudentLessonActivity.student_id)
+                    .where(
+                        StudentLessonActivity.student_id.in_(student_ids),
+                        StudentLessonActivity.last_accessed_at >= seven_days_ago,
+                    )
+                    .distinct()
+                ).scalars().all()
+            )
 
-        active_students_count = len(active_completers | active_submitters | active_accessers)
+            active_students_count = len(active_completers | active_submitters | active_accessers)
 
         # 2. Average course completion across all enrolled students and courses
-        enrollments = (
-            db.execute(
-                select(CourseEnrollment).where(
-                    CourseEnrollment.student_id.in_(student_ids)
+        avg_course_completion = 0.0
+        if student_ids:
+            enrollments = (
+                db.execute(
+                    select(CourseEnrollment).where(
+                        CourseEnrollment.student_id.in_(student_ids)
+                    )
                 )
+                .scalars()
+                .all()
             )
-            .scalars()
-            .all()
-        )
 
-        if enrollments:
-            total_pct_sum = sum(
-                cls._calculate_student_course_completion_pct(
-                    db, e.student_id, e.course_id
+            if enrollments:
+                total_pct_sum = sum(
+                    cls._calculate_student_course_completion_pct(
+                        db, e.student_id, e.course_id
+                    )
+                    for e in enrollments
                 )
-                for e in enrollments
+                avg_course_completion = round(total_pct_sum / len(enrollments), 1)
+
+        # 3. Total submissions today (roster students OR problems created by this teacher)
+        sub_filters = []
+        if student_ids:
+            sub_filters.append(Submission.student_id.in_(student_ids))
+        if teacher_problem_ids:
+            sub_filters.append(Submission.problem_id.in_(teacher_problem_ids))
+
+        if sub_filters:
+            total_submissions_today = (
+                db.scalar(
+                    select(func.count(Submission.id)).where(
+                        func.date(Submission.created_at) == today_date,
+                        or_(*sub_filters),
+                    )
+                )
+                or 0
             )
-            avg_course_completion = round(total_pct_sum / len(enrollments), 1)
         else:
-            avg_course_completion = 0.0
-
-        # 3. Total submissions today
-        total_submissions_today = (
-            db.scalar(
-                select(func.count(Submission.id)).where(
-                    Submission.student_id.in_(student_ids),
-                    func.date(Submission.created_at) == today_date,
-                )
-            )
-            or 0
-        )
+            total_submissions_today = 0
 
         # 4. Recent activity feed (completions + submissions merged, top 10)
         recent_completions = (

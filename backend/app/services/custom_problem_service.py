@@ -10,13 +10,17 @@ from sqlalchemy.orm import Session
 
 from app.models.assignment import Assignment
 from app.models.custom_problem import CustomProblem
+from app.models.custom_problem_completion import CustomProblemCompletion
 from app.models.student_teacher import StudentTeacher
+from app.models.submission import Submission
 from app.models.teacher_profile import TeacherProfile
 from app.models.user import User
 from app.schemas.custom_problem import (
     CustomProblemCreate,
     CustomProblemResponse,
     CustomProblemStatsResponse,
+    CustomProblemSubmissionItem,
+    CustomProblemSubmissionsResponse,
 )
 from app.services.ai_tutor_service import AITutorService
 from app.services.badge_service import BadgeService
@@ -247,12 +251,16 @@ class CustomProblemService:
 
         result = []
         for p in problems:
-            # Count assignments/completions associated with this custom problem
-            assignments = db.scalars(
-                select(Assignment).where(Assignment.custom_problem_id == p.id)
-            ).all()
-            total_assigned = len(assignments)
-            completed_count = sum(1 for a in assignments if a.status == "COMPLETED")
+            # Count actual submissions/ACs for this custom problem
+            total_subs = db.scalar(
+                select(func.count(Submission.id)).where(Submission.problem_id == p.id)
+            ) or 0
+            accepted_subs = db.scalar(
+                select(func.count(Submission.id)).where(
+                    Submission.problem_id == p.id,
+                    Submission.verdict == "AC",
+                )
+            ) or 0
 
             result.append(
                 CustomProblemResponse(
@@ -268,8 +276,8 @@ class CustomProblemService:
                     test_cases=p.test_cases or [],
                     visibility=p.visibility,
                     created_at=p.created_at,
-                    total_submissions=total_assigned,
-                    accepted_submissions=completed_count,
+                    total_submissions=total_subs,
+                    accepted_submissions=accepted_subs,
                 )
             )
         return result
@@ -299,14 +307,49 @@ class CustomProblemService:
             teacher = db.scalar(select(User).where(User.id == p.teacher_id))
             teacher_name = (f"{teacher.first_name or ''} {teacher.last_name or ''}".strip() or teacher.username) if teacher else "Mentor"
 
-            # Check if this student solved it
-            completed = db.scalar(
-                select(func.count(Assignment.id)).where(
-                    Assignment.custom_problem_id == p.id,
-                    Assignment.student_id == student_id,
-                    Assignment.status == "COMPLETED",
+            # Check if this student solved it (via CustomProblemCompletion or AC submission)
+            is_comp = (
+                db.scalar(
+                    select(func.count(CustomProblemCompletion.id)).where(
+                        CustomProblemCompletion.custom_problem_id == p.id,
+                        CustomProblemCompletion.student_id == student_id,
+                    )
                 )
-            ) or 0
+                or 0
+            )
+            has_ac_sub = (
+                db.scalar(
+                    select(func.count(Submission.id)).where(
+                        Submission.problem_id == p.id,
+                        Submission.student_id == student_id,
+                        Submission.verdict == "AC",
+                    )
+                )
+                or 0
+            )
+            is_completed = (is_comp > 0) or (has_ac_sub > 0)
+
+            # Determine best/latest verdict
+            latest_sub = db.scalar(
+                select(Submission)
+                .where(
+                    Submission.problem_id == p.id,
+                    Submission.student_id == student_id,
+                )
+                .order_by(Submission.created_at.desc())
+            )
+            best_verdict = "AC" if is_completed else (latest_sub.verdict if latest_sub else None)
+
+            # Available languages
+            langs = []
+            if (p.starter_code_python and p.starter_code_python.strip()) or (p.starter_code and p.starter_code.strip()):
+                langs.append("python")
+            if p.starter_code_java and p.starter_code_java.strip():
+                langs.append("java")
+            if p.starter_code_cpp and p.starter_code_cpp.strip():
+                langs.append("cpp")
+            if not langs:
+                langs = ["python", "java", "cpp"]
 
             result.append(
                 CustomProblemResponse(
@@ -322,8 +365,12 @@ class CustomProblemService:
                     test_cases=p.test_cases or [],
                     visibility=p.visibility,
                     created_at=p.created_at,
-                    total_submissions=1 if completed > 0 else 0,
-                    accepted_submissions=1 if completed > 0 else 0,
+                    total_submissions=1 if is_completed else (1 if latest_sub else 0),
+                    accepted_submissions=1 if is_completed else 0,
+                    is_completed=is_completed,
+                    xp_reward=50,
+                    best_verdict=best_verdict,
+                    languages=langs,
                 )
             )
         return result
@@ -431,13 +478,19 @@ class CustomProblemService:
                 detail="You can only view stats for problems you created.",
             )
 
-        assignments = db.scalars(
-            select(Assignment).where(Assignment.custom_problem_id == problem.id)
-        ).all()
+        # Count ALL submissions directly for this custom problem created by the teacher
+        total_attempts = db.scalar(
+            select(func.count(Submission.id)).where(Submission.problem_id == problem.id)
+        ) or 0
 
-        total_attempts = len(assignments)
-        completed_count = sum(1 for a in assignments if a.status == "COMPLETED")
-        success_rate = (completed_count / total_attempts * 100.0) if total_attempts > 0 else 0.0
+        successful_ac = db.scalar(
+            select(func.count(Submission.id)).where(
+                Submission.problem_id == problem.id,
+                Submission.verdict == "AC",
+            )
+        ) or 0
+
+        pass_rate = (successful_ac / total_attempts * 100.0) if total_attempts > 0 else 0.0
 
         # Teacher's class students
         class_student_ids = set(
@@ -445,6 +498,10 @@ class CustomProblemService:
                 select(StudentTeacher.student_id).where(StudentTeacher.teacher_id == teacher_id)
             ).all()
         )
+
+        assignments = db.scalars(
+            select(Assignment).where(Assignment.custom_problem_id == problem.id)
+        ).all()
 
         roster_stats = []
         for a in assignments:
@@ -463,14 +520,103 @@ class CustomProblemService:
                 "completed_at": a.completed_at.isoformat() if a.completed_at else None,
             })
 
+        # Fetch recent submissions history with student code
+        subs = db.scalars(
+            select(Submission)
+            .where(Submission.problem_id == problem.id)
+            .order_by(Submission.created_at.desc())
+            .limit(50)
+        ).all()
+
+        submission_items = []
+        for s in subs:
+            student = db.scalar(select(User).where(User.id == s.student_id))
+            student_name = (f"{student.first_name or ''} {student.last_name or ''}".strip() or student.username) if student else "Student"
+            student_email = student.email if student else None
+            submission_items.append(
+                CustomProblemSubmissionItem(
+                    submission_id=s.id,
+                    student_id=s.student_id,
+                    student_name=student_name,
+                    student_email=student_email,
+                    verdict=s.verdict,
+                    language=s.language,
+                    runtime_ms=s.execution_time_ms,
+                    xp_awarded=getattr(s, "xp_awarded", 0) or (50 if s.verdict == "AC" and getattr(s, "is_first_ac", False) else 0),
+                    is_first_ac=getattr(s, "is_first_ac", False),
+                    created_at=s.created_at,
+                    code=s.code,
+                )
+            )
+
         return CustomProblemStatsResponse(
             id=problem.id,
             title=problem.title,
             visibility=problem.visibility,
             total_attempts=total_attempts,
-            successful_submissions=completed_count,
-            success_rate=round(success_rate, 1),
+            successful_submissions=successful_ac,
+            success_rate=round(pass_rate, 1),
+            pass_rate=round(pass_rate, 1),
             class_roster_stats=roster_stats,
+            submissions=submission_items,
             public_stats_count=total_attempts if problem.visibility == "PUBLIC" else 0,
+        )
+
+    @staticmethod
+    def get_custom_problem_submissions(
+        db: Session,
+        problem_id: UUID,
+        teacher_id: UUID,
+    ) -> CustomProblemSubmissionsResponse:
+        problem = db.scalar(select(CustomProblem).where(CustomProblem.id == problem_id))
+        if not problem:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Custom problem not found",
+            )
+        if problem.teacher_id != teacher_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You can only view submissions for problems you created.",
+            )
+
+        subs = db.scalars(
+            select(Submission)
+            .where(Submission.problem_id == problem.id)
+            .order_by(Submission.created_at.desc())
+        ).all()
+
+        items = []
+        successful_ac = 0
+        for s in subs:
+            if s.verdict == "AC":
+                successful_ac += 1
+            student = db.scalar(select(User).where(User.id == s.student_id))
+            student_name = (f"{student.first_name or ''} {student.last_name or ''}".strip() or student.username) if student else "Student"
+            student_email = student.email if student else None
+            items.append(
+                CustomProblemSubmissionItem(
+                    submission_id=s.id,
+                    student_id=s.student_id,
+                    student_name=student_name,
+                    student_email=student_email,
+                    verdict=s.verdict,
+                    language=s.language,
+                    runtime_ms=s.execution_time_ms,
+                    xp_awarded=getattr(s, "xp_awarded", 0) or (50 if s.verdict == "AC" and getattr(s, "is_first_ac", False) else 0),
+                    is_first_ac=getattr(s, "is_first_ac", False),
+                    created_at=s.created_at,
+                    code=s.code,
+                )
+            )
+
+        total_attempts = len(subs)
+        pass_rate = (successful_ac / total_attempts * 100.0) if total_attempts > 0 else 0.0
+
+        return CustomProblemSubmissionsResponse(
+            items=items,
+            total_attempts=total_attempts,
+            successful_ac=successful_ac,
+            pass_rate=round(pass_rate, 1),
         )
 

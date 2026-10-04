@@ -2216,6 +2216,8 @@ class _MentorChallengesSectionState extends State<MentorChallengesSection> {
               final hasJava = c['starter_code_java']?.toString().isNotEmpty ?? false;
               final hasCpp = c['starter_code_cpp']?.toString().isNotEmpty ?? false;
 
+              final isCompleted = c['is_completed'] == true;
+
               return InkWell(
                 borderRadius: BorderRadius.circular(16),
                 onTap: () {
@@ -2227,7 +2229,10 @@ class _MentorChallengesSectionState extends State<MentorChallengesSection> {
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    border: Border.all(
+                      color: isCompleted ? const Color(0xFF86EFAC) : const Color(0xFFE2E8F0),
+                      width: isCompleted ? 1.5 : 1.0,
+                    ),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withValues(alpha: 0.02),
@@ -2261,7 +2266,27 @@ class _MentorChallengesSectionState extends State<MentorChallengesSection> {
                                 ),
                               ),
                               const Spacer(),
-                              Icon(Icons.code_rounded, size: 16, color: Colors.purple.shade600),
+                              if (isCompleted)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFDCFCE7),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.check_circle_rounded, size: 12, color: Color(0xFF10B981)),
+                                      SizedBox(width: 3),
+                                      Text(
+                                        'Completed',
+                                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF047857)),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              else
+                                Icon(Icons.code_rounded, size: 16, color: Colors.purple.shade600),
                             ],
                           ),
                           const SizedBox(height: 8),
@@ -2306,16 +2331,20 @@ class _MentorChallengesSectionState extends State<MentorChallengesSection> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF0F172A),
+                              color: isCompleted ? const Color(0xFF047857) : const Color(0xFF0F172A),
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: const Row(
+                            child: Row(
                               children: [
-                                Icon(Icons.terminal_rounded, size: 14, color: Colors.white),
-                                SizedBox(width: 4),
+                                Icon(
+                                  isCompleted ? Icons.check_circle_outline_rounded : Icons.terminal_rounded,
+                                  size: 14,
+                                  color: Colors.white,
+                                ),
+                                const SizedBox(width: 4),
                                 Text(
-                                  'Solve',
-                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                                  isCompleted ? 'Solved' : 'Solve',
+                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
                                 ),
                               ],
                             ),

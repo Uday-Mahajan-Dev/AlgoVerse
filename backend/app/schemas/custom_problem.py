@@ -36,8 +36,33 @@ class CustomProblemResponse(BaseModel):
     created_at: datetime
     total_submissions: int = 0
     accepted_submissions: int = 0
+    is_completed: bool = False
+    xp_reward: int = 50
+    best_verdict: str | None = None
+    languages: list[str] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class CustomProblemSubmissionItem(BaseModel):
+    submission_id: UUID
+    student_id: UUID
+    student_name: str
+    student_email: str | None = None
+    verdict: str
+    language: str
+    runtime_ms: int | None = None
+    xp_awarded: int = 0
+    is_first_ac: bool = False
+    created_at: datetime
+    code: str
+
+
+class CustomProblemSubmissionsResponse(BaseModel):
+    items: list[CustomProblemSubmissionItem] = Field(default_factory=list)
+    total_attempts: int
+    successful_ac: int
+    pass_rate: float
 
 
 class CustomProblemStatsResponse(BaseModel):
@@ -47,7 +72,9 @@ class CustomProblemStatsResponse(BaseModel):
     total_attempts: int
     successful_submissions: int
     success_rate: float
+    pass_rate: float = 0.0
     class_roster_stats: list[dict[str, Any]] = Field(default_factory=list)
+    submissions: list[CustomProblemSubmissionItem] = Field(default_factory=list)
     public_stats_count: int = 0
 
 
