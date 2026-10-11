@@ -95,17 +95,21 @@ class CodeViewerWidget extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(width: 14),
-                const Text(
-                  'ALGORITHM EXECUTION TRACE',
-                  style: TextStyle(
-                    color: Color(0xFFCDD6F4),
-                    fontSize: 11,
-                    fontFamily: 'monospace',
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.1,
+                const Expanded(
+                  child: Text(
+                    'ALGORITHM EXECUTION TRACE',
+                    style: TextStyle(
+                      color: Color(0xFFCDD6F4),
+                      fontSize: 11,
+                      fontFamily: 'monospace',
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.1,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const Spacer(),
+                const SizedBox(width: 8),
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 2),

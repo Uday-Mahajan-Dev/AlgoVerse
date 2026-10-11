@@ -1,3 +1,4 @@
+import asyncio
 import unittest
 from datetime import datetime, timezone
 from uuid import uuid4
@@ -63,6 +64,19 @@ class TestCustomProblems(unittest.TestCase):
         self.db.add(student)
         self.db.commit()
 
+        # Teacher profile with is_verified=True
+        from app.models.teacher_profile import TeacherProfile
+        profile = TeacherProfile(
+            user_id=teacher.id,
+            institution_name="MIT",
+            designation="Professor",
+            class_code=f"CP-{uuid4().hex[:4].upper()}",
+            is_verified=True,
+            is_accepting_requests=True,
+        )
+        self.db.add(profile)
+        self.db.commit()
+
         # Link student to teacher
         link = StudentTeacher(student_id=student.id, teacher_id=teacher.id)
         self.db.add(link)
@@ -73,8 +87,11 @@ class TestCustomProblems(unittest.TestCase):
             title="Add Two Numbers Test",
             description="Given two integers a and b, return their sum.",
             starter_code="def solve():\n    pass\n",
+            starter_code_python="def solve():\n    pass\n",
+            starter_code_java="public class Main {}",
+            starter_code_cpp="int main() { return 0; }",
             test_cases=[
-                TestCaseItem(input="3 5", expected="8", is_hidden=False),
+                TestCaseItem(input="3 5", expected="8", is_hidden=False, explanation="3 + 5 = 8"),
                 TestCaseItem(input="10 20", expected="30", is_hidden=True),
             ],
             visibility="PUBLIC",
@@ -96,12 +113,14 @@ class TestCustomProblems(unittest.TestCase):
 import sys
 print(0)
 """
-        wa_res = JudgeService.submit_solution(
-            db=self.db,
-            student_id=student.id,
-            problem_id=problem_res.id,
-            code=wa_solution,
-            language="python",
+        wa_res = asyncio.run(
+            JudgeService.submit_solution(
+                db=self.db,
+                student_id=student.id,
+                problem_id=problem_res.id,
+                code=wa_solution,
+                language="python",
+            )
         )
         self.assertEqual(wa_res.verdict, "WA")
         self.assertEqual(wa_res.xp_awarded, 0)
@@ -125,12 +144,14 @@ if nums:
     a, b = int(nums[0]), int(nums[1])
     print(a + b)
 """
-        first_ac_res = JudgeService.submit_solution(
-            db=self.db,
-            student_id=student.id,
-            problem_id=problem_res.id,
-            code=py_solution,
-            language="python",
+        first_ac_res = asyncio.run(
+            JudgeService.submit_solution(
+                db=self.db,
+                student_id=student.id,
+                problem_id=problem_res.id,
+                code=py_solution,
+                language="python",
+            )
         )
 
         self.assertEqual(first_ac_res.verdict, "AC")
@@ -150,12 +171,14 @@ if nums:
         self.assertTrue(matching_after[0].is_completed)
 
         # 3. Test Second AC submission (practice resubmit)
-        second_ac_res = JudgeService.submit_solution(
-            db=self.db,
-            student_id=student.id,
-            problem_id=problem_res.id,
-            code=py_solution,
-            language="python",
+        second_ac_res = asyncio.run(
+            JudgeService.submit_solution(
+                db=self.db,
+                student_id=student.id,
+                problem_id=problem_res.id,
+                code=py_solution,
+                language="python",
+            )
         )
         self.assertEqual(second_ac_res.verdict, "AC")
         self.assertFalse(second_ac_res.is_first_ac)

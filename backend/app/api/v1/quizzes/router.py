@@ -7,11 +7,13 @@ from app.api.deps import (
     get_current_student,
     get_current_teacher,
     get_current_user,
+    get_verified_teacher,
     get_db,
 )
 from app.models.user import User
 from app.schemas.quiz import (
     QuizCreate,
+    QuizUpdate,
     QuizLeaderboardEntry,
     QuizResponse,
     QuizStatsResponse,
@@ -36,10 +38,51 @@ def create_quiz(
     current_teacher: User = Depends(get_current_teacher),
     db: Session = Depends(get_db),
 ):
+    if data.visibility in ("PUBLIC", "CLASS_ONLY"):
+        get_verified_teacher(current_teacher, db)
     return QuizService.create_quiz(
         db=db,
         teacher_id=current_teacher.id,
         data=data,
+    )
+
+
+@router.put(
+    "/{quiz_id}",
+    response_model=QuizResponse,
+    summary="Update an existing quiz (Teacher only)",
+)
+def update_quiz(
+    quiz_id: UUID,
+    data: QuizUpdate,
+    current_teacher: User = Depends(get_current_teacher),
+    db: Session = Depends(get_db),
+):
+    if data.visibility in ("PUBLIC", "CLASS_ONLY"):
+        get_verified_teacher(current_teacher, db)
+    return QuizService.update_quiz(
+        db=db,
+        quiz_id=quiz_id,
+        teacher_id=current_teacher.id,
+        data=data,
+    )
+
+
+@router.post(
+    "/{quiz_id}/publish",
+    response_model=QuizResponse,
+    summary="Publish a quiz to students (verified faculty only)",
+)
+def publish_quiz(
+    quiz_id: UUID,
+    verified_teacher: User = Depends(get_verified_teacher),
+    db: Session = Depends(get_db),
+):
+    return QuizService.update_quiz(
+        db=db,
+        quiz_id=quiz_id,
+        teacher_id=verified_teacher.id,
+        data=QuizUpdate(visibility="CLASS_ONLY"),
     )
 
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/token_storage.dart';
+import '../widgets/problem_rating_widget.dart';
 
 class CustomProblemWorkspacePage extends StatefulWidget {
   final String problemId;
@@ -231,9 +232,23 @@ class _CustomProblemWorkspacePageState
             ),
           ],
         ),
-        content: Text(
-          message,
-          style: const TextStyle(height: 1.4),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                message,
+                style: const TextStyle(height: 1.4),
+              ),
+              const SizedBox(height: 16),
+              ProblemRatingWidget(
+                problemId: widget.problemId,
+                problemKind: 'custom',
+                problemTitle: _problem?['title']?.toString(),
+              ),
+            ],
+          ),
         ),
         actions: [
           FilledButton(
@@ -241,7 +256,7 @@ class _CustomProblemWorkspacePageState
               Navigator.of(ctx).pop();
             },
             style: FilledButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
-            child: const Text('Awesome'),
+            child: const Text('Close'),
           ),
         ],
       ),
@@ -290,10 +305,14 @@ class _CustomProblemWorkspacePageState
           children: [
             Text(
               title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
             ),
             Text(
               'Authored by $teacherName',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(fontSize: 12, color: Colors.purple.shade200),
             ),
           ],
@@ -459,6 +478,7 @@ class _CustomProblemWorkspacePageState
           ...testCases.where((tc) => tc['is_hidden'] != true).map((tc) {
             final input = tc['input']?.toString() ?? '';
             final expected = tc['expected']?.toString() ?? '';
+            final explanation = tc['explanation']?.toString();
 
             return Container(
               margin: const EdgeInsets.only(bottom: 12),
@@ -478,10 +498,51 @@ class _CustomProblemWorkspacePageState
                   const Text('Expected Output:', style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 2),
                   Text(expected, style: const TextStyle(fontFamily: 'monospace', color: Color(0xFF10B981), fontSize: 13)),
+                  if (explanation != null && explanation.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    const Text('Explanation:', style: TextStyle(fontSize: 11, color: Color(0xFFFBBF24), fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 2),
+                    Text(explanation, style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 12, height: 1.3)),
+                  ],
                 ],
               ),
             );
           }),
+          ...testCases.where((tc) => tc['is_hidden'] == true).map((tc) {
+            final idx = tc['test_index'] ?? (testCases.indexOf(tc) + 1);
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E293B).withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.white10),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.lock_rounded, size: 16, color: Colors.white38),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Hidden Test #$idx',
+                    style: const TextStyle(fontSize: 13, color: Colors.white70, fontWeight: FontWeight.w600),
+                  ),
+                  const Spacer(),
+                  const Text(
+                    'Evaluated on Submit',
+                    style: TextStyle(fontSize: 11, color: Colors.white38, fontStyle: FontStyle.italic),
+                  ),
+                ],
+              ),
+            );
+          }),
+          const SizedBox(height: 24),
+          const Divider(color: Colors.white12),
+          const SizedBox(height: 16),
+          ProblemRatingWidget(
+            problemId: widget.problemId,
+            problemKind: 'custom',
+            problemTitle: title,
+          ),
         ],
       ),
     );
@@ -649,6 +710,10 @@ class _CustomProblemWorkspacePageState
                     const SizedBox(height: 8),
                     ...(_executionResult!['test_results'] as List).map((tr) {
                       final passed = tr['passed'] == true;
+                      final isHidden = tr['is_hidden'] == true;
+                      final title = isHidden ? 'Hidden Test #${tr['test_index']}' : 'Test #${tr['test_index']}';
+                      final verdictLabel = passed ? 'Passed' : (isHidden ? 'Failed' : 'Failed (${tr['error_message'] ?? 'Wrong Answer'})');
+
                       return Container(
                         margin: const EdgeInsets.only(bottom: 6),
                         padding: const EdgeInsets.all(8),
@@ -665,7 +730,7 @@ class _CustomProblemWorkspacePageState
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              'Test #${tr['test_index']}: ${passed ? "Passed" : "Failed (${tr['error_message'] ?? 'Wrong Answer'})"}',
+                              '$title — $verdictLabel',
                               style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.bold),
                             ),
                           ],

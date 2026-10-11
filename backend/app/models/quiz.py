@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import ForeignKey, Integer, String, Text
+from sqlalchemy import Float, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -38,6 +38,29 @@ class Quiz(BaseModel):
         Integer,
         nullable=False,
         default=30,
+    )
+
+    scoring_mode: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="FLAT",
+    )  # "FLAT" | "TIME_MULTIPLIER"
+
+    time_limit_seconds: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+    )
+
+    min_multiplier: Mapped[float] = mapped_column(
+        Float,
+        nullable=False,
+        default=0.5,
+    )
+
+    decay: Mapped[float] = mapped_column(
+        Float,
+        nullable=False,
+        default=0.5,
     )
 
     teacher = relationship(

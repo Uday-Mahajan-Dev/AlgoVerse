@@ -164,8 +164,8 @@ class _QuizLeaderboardPageState extends State<QuizLeaderboardPage> {
           final item = _leaderboard[index];
           final rank = item['rank'] ?? (index + 1);
           final name = item['student_name']?.toString() ?? 'Student';
-          final score = item['score'] ?? 0;
-          final time = item['total_time_seconds'] ?? 0;
+          final score = item['final_score'] ?? item['score'] ?? 0;
+          final time = item['time_taken_seconds'] ?? item['total_time_seconds'] ?? 0;
 
           Color rankBg;
           Color rankColor;

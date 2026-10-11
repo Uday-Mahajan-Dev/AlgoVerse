@@ -137,4 +137,23 @@ def require_roles(*roles: UserRole):
 get_current_admin = require_role(UserRole.ADMIN)
 get_current_teacher = require_role(UserRole.TEACHER)
 get_current_student = require_role(UserRole.STUDENT)
-get_current_course_creator = require_roles(UserRole.TEACHER, UserRole.ADMIN)
+get_current_course_creator = require_roles(UserRole.TEACHER, UserRole.ADMIN)
+
+
+def get_verified_teacher(
+    current_teacher: User = Depends(get_current_teacher),
+    db: Session = Depends(get_db),
+) -> User:
+    from sqlalchemy import select
+    from app.models.teacher_profile import TeacherProfile
+
+    profile = db.scalar(
+        select(TeacherProfile).where(TeacherProfile.user_id == current_teacher.id)
+    )
+    if not profile or not profile.is_verified:
+        raise HTTPException(
+            status_code=403,
+            detail="Faculty account requires administrator verification before accessing this action.",
+        )
+    return current_teacher
+

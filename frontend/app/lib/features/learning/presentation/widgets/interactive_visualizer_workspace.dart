@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../domain/entities/execution_trace.dart';
 import '../../engine/array_algorithm_executor.dart';
@@ -30,6 +31,7 @@ class _InteractiveVisualizerWorkspaceState
   late String _selectedAlgorithm;
   late Map<String, dynamic> _currentInput;
   late ExecutionTrace _trace;
+  String _selectedLanguage = 'python';
 
   int _currentStepIndex = 0;
   bool _isPlaying = false;
@@ -41,6 +43,7 @@ class _InteractiveVisualizerWorkspaceState
   void initState() {
     super.initState();
     _initAlgorithmState();
+    _loadPreferredLanguage();
   }
 
   @override
@@ -193,20 +196,96 @@ class _InteractiveVisualizerWorkspaceState
     super.dispose();
   }
 
-  String _getActiveCodeSnippet() {
-    if (widget.contentJson['code_snippets'] is Map) {
-      final snippets = Map<String, dynamic>.from(
-        widget.contentJson['code_snippets'] as Map,
-      );
-      return snippets[_selectedAlgorithm]?.toString() ?? '';
+  Map<String, String> _getAvailableSnippets() {
+    final rawSnippets = widget.contentJson['code_snippets'];
+    if (rawSnippets is Map && rawSnippets.isNotEmpty) {
+      final map = <String, String>{};
+      rawSnippets.forEach((k, v) {
+        if (v != null && v.toString().trim().isNotEmpty) {
+          map[k.toString().toLowerCase()] = v.toString();
+        }
+      });
+      if (map.containsKey(_selectedAlgorithm)) {
+        return {'python': map[_selectedAlgorithm]!};
+      }
+      return map;
     }
-    return widget.contentJson['code_snippet']?.toString() ?? '';
+    final single = widget.contentJson['code_snippet']?.toString();
+    if (single != null && single.trim().isNotEmpty) {
+      return {'python': single};
+    }
+    return {};
+  }
+
+  Future<void> _loadPreferredLanguage() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedLang = prefs.getString('visualizer_preferred_language')?.toLowerCase();
+      final snippets = _getAvailableSnippets();
+      if (savedLang != null && snippets.containsKey(savedLang)) {
+        if (mounted) setState(() => _selectedLanguage = savedLang);
+      } else {
+        final defLang = widget.contentJson['default_language']?.toString().toLowerCase() ?? 'python';
+        if (snippets.containsKey(defLang)) {
+          if (mounted) setState(() => _selectedLanguage = defLang);
+        } else if (snippets.isNotEmpty) {
+          if (mounted) setState(() => _selectedLanguage = snippets.keys.first);
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _switchLanguage(String lang) async {
+    if (_selectedLanguage == lang) return;
+    setState(() {
+      _selectedLanguage = lang;
+    });
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('visualizer_preferred_language', lang);
+    } catch (_) {}
+  }
+
+  String _formatLanguageLabel(String lang) {
+    switch (lang.toLowerCase()) {
+      case 'python':
+      case 'py':
+        return 'Python';
+      case 'java':
+        return 'Java';
+      case 'cpp':
+      case 'c++':
+        return 'C++';
+      default:
+        return lang.isEmpty ? '' : lang[0].toUpperCase() + lang.substring(1);
+    }
+  }
+
+  int _getActiveSourceLine(int? baseLine) {
+    if (baseLine == null || baseLine <= 0) return 0;
+    final lineMaps = widget.contentJson['line_maps'];
+    if (lineMaps is Map) {
+      final langMap = lineMaps[_selectedLanguage];
+      if (langMap is Map) {
+        final mapped = langMap[baseLine.toString()] ?? langMap[baseLine];
+        if (mapped is int) return mapped;
+        return int.tryParse(mapped?.toString() ?? '') ?? 0;
+      } else {
+        // Fallback: if line_maps[selected] missing → disable line highlight for that language
+        return 0;
+      }
+    }
+    return _selectedLanguage == 'python' ? baseLine : 0;
   }
 
   @override
   Widget build(BuildContext context) {
     final currentStep = _trace.getStep(_currentStepIndex);
-    final codeSnippet = _getActiveCodeSnippet();
+    final availableSnippets = _getAvailableSnippets();
+    final showLanguageToggle = availableSnippets.length > 1;
+    final activeSnippet = availableSnippets[_selectedLanguage] ??
+        (availableSnippets.isNotEmpty ? availableSnippets.values.first : '');
+    final activeLine = _getActiveSourceLine(currentStep?.sourceLine);
     final complexity = widget.contentJson['complexity'] is Map
         ? Map<String, dynamic>.from(widget.contentJson['complexity'] as Map)
         : null;
@@ -374,10 +453,52 @@ class _InteractiveVisualizerWorkspaceState
         final codeAndInputPane = Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (codeSnippet.isNotEmpty) ...[
+            if (showLanguageToggle) ...[
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    const Icon(Icons.code_rounded, size: 16, color: Color(0xFF64748B)),
+                    const Text(
+                      'Language:',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                    ...availableSnippets.keys.map((lang) {
+                      final isSelected = lang == _selectedLanguage;
+                      return ChoiceChip(
+                        label: Text(_formatLanguageLabel(lang)),
+                        selected: isSelected,
+                        onSelected: (_) => _switchLanguage(lang),
+                        selectedColor: const Color(0xFF6366F1),
+                        labelStyle: TextStyle(
+                          color: isSelected ? Colors.white : const Color(0xFF334155),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                        backgroundColor: const Color(0xFFF1F5F9),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          side: BorderSide(
+                            color: isSelected ? const Color(0xFF6366F1) : const Color(0xFFCBD5E1),
+                          ),
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              ),
+            ],
+            if (activeSnippet.isNotEmpty) ...[
               CodeViewerWidget(
-                codeSnippet: codeSnippet,
-                activeSourceLine: currentStep?.sourceLine ?? 1,
+                codeSnippet: activeSnippet,
+                activeSourceLine: activeLine,
                 explanation: currentStep?.explanation ?? '',
                 operation: currentStep?.operation ?? 'INIT',
               ),

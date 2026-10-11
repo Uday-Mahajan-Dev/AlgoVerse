@@ -84,4 +84,14 @@ class CourseProgressResponse(BaseModel):
     total_lessons: int = 0
     completed_lessons: int = 0
     completion_percentage: float = 0.0
+    progress_percentage: float = 0.0
+    completed_lesson_ids: list[UUID] = Field(default_factory=list)
     last_completed_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class LessonSnippetUpdateRequest(BaseModel):
+    code_snippets: dict[str, str]
+    line_maps: dict[str, dict[str, Any]] | None = None
+    default_language: str = "python"

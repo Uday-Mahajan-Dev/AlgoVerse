@@ -161,16 +161,20 @@ class _InputCustomizerState extends State<InputCustomizer> {
             children: [
               const Icon(Icons.tune_rounded, size: 18, color: Colors.indigo),
               const SizedBox(width: 8),
-              const Text(
-                'CUSTOMIZE INPUT DATA',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.1,
-                  color: Colors.indigo,
+              const Expanded(
+                child: Text(
+                  'CUSTOMIZE INPUT DATA',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.1,
+                    color: Colors.indigo,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
               TextButton.icon(
                 onPressed: _reset,
                 icon: const Icon(Icons.refresh_rounded, size: 14),

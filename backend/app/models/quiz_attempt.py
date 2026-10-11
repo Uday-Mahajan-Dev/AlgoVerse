@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import DateTime, ForeignKey, Integer, func
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -32,10 +32,34 @@ class QuizAttempt(BaseModel):
         default=0,
     )
 
+    raw_score: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+    )
+
+    final_score: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+    )
+
     total_time_seconds: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
         default=0,
+    )
+
+    time_taken_seconds: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+    )
+
+    multiplier_applied: Mapped[float] = mapped_column(
+        Float,
+        nullable=False,
+        default=1.0,
     )
 
     answers: Mapped[list[dict[str, Any]]] = mapped_column(

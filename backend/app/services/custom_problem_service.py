@@ -17,6 +17,7 @@ from app.models.teacher_profile import TeacherProfile
 from app.models.user import User
 from app.schemas.custom_problem import (
     CustomProblemCreate,
+    CustomProblemUpdate,
     CustomProblemResponse,
     CustomProblemStatsResponse,
     CustomProblemSubmissionItem,
@@ -31,6 +32,28 @@ logger = logging.getLogger(__name__)
 
 
 class CustomProblemService:
+
+    @staticmethod
+    def mask_test_cases_for_student(test_cases: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        sanitized = []
+        for idx, tc in enumerate(test_cases, start=1):
+            is_hidden = tc.get("is_hidden", True)
+            if is_hidden:
+                sanitized.append({
+                    "test_index": idx,
+                    "name": f"Hidden Test #{idx}",
+                    "is_hidden": True,
+                })
+            else:
+                sanitized.append({
+                    "test_index": idx,
+                    "name": f"Test Case #{idx}",
+                    "input": tc.get("input", ""),
+                    "expected": tc.get("expected", ""),
+                    "is_hidden": False,
+                    "explanation": tc.get("explanation", ""),
+                })
+        return sanitized
 
     @staticmethod
     def auto_generate_starter_codes(code: str, source_lang: str = "python") -> dict[str, str]:
@@ -177,6 +200,15 @@ class CustomProblemService:
                 java_code = generated["starter_code_java"]
             if not cpp_code:
                 cpp_code = generated["starter_code_cpp"]
+
+        # Check teacher verification if publishing directly
+        if (data.visibility or "").upper() in ("CLASS_ONLY", "PUBLIC"):
+            profile = db.scalar(select(TeacherProfile).where(TeacherProfile.user_id == teacher_id))
+            if not profile or not profile.is_verified:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Faculty account requires administrator verification before publishing problems to students.",
+                )
 
         problem = CustomProblem(
             teacher_id=teacher_id,
@@ -442,6 +474,9 @@ class CustomProblemService:
         teacher = db.scalar(select(User).where(User.id == problem.teacher_id))
         teacher_name = (f"{teacher.first_name or ''} {teacher.last_name or ''}".strip() or teacher.username) if teacher else "Educator"
 
+        is_owner = (problem.teacher_id == user_id)
+        test_cases_to_return = problem.test_cases if is_owner else CustomProblemService.mask_test_cases_for_student(problem.test_cases or [])
+
         return CustomProblemResponse(
             id=problem.id,
             teacher_id=problem.teacher_id,
@@ -452,11 +487,74 @@ class CustomProblemService:
             starter_code_python=problem.starter_code_python or problem.starter_code or "",
             starter_code_java=problem.starter_code_java or "",
             starter_code_cpp=problem.starter_code_cpp or "",
-            test_cases=problem.test_cases or [],
+            test_cases=test_cases_to_return,
             visibility=problem.visibility,
             created_at=problem.created_at,
             total_submissions=0,
             accepted_submissions=0,
+        )
+
+    @staticmethod
+    def update_custom_problem(
+        db: Session,
+        problem_id: UUID,
+        teacher_id: UUID,
+        data: CustomProblemUpdate,
+    ) -> CustomProblemResponse:
+        problem = db.scalar(select(CustomProblem).where(CustomProblem.id == problem_id))
+        if not problem:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Custom problem not found")
+        if problem.teacher_id != teacher_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only edit problems you created.")
+
+        if data.title is not None:
+            problem.title = data.title.strip()
+        if data.description is not None:
+            problem.description = data.description.strip()
+        if data.starter_code_python is not None:
+            problem.starter_code_python = data.starter_code_python
+            problem.starter_code = data.starter_code_python
+        elif data.starter_code is not None:
+            problem.starter_code = data.starter_code
+            problem.starter_code_python = data.starter_code
+        if data.starter_code_java is not None:
+            problem.starter_code_java = data.starter_code_java
+        if data.starter_code_cpp is not None:
+            problem.starter_code_cpp = data.starter_code_cpp
+        if data.visibility is not None:
+            new_vis = data.visibility.upper()
+            if new_vis in ("CLASS_ONLY", "PUBLIC") and problem.visibility != new_vis:
+                profile = db.scalar(select(TeacherProfile).where(TeacherProfile.user_id == teacher_id))
+                if not profile or not profile.is_verified:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Faculty account requires administrator verification before publishing problems to students.",
+                    )
+            problem.visibility = new_vis
+        if data.test_cases is not None:
+            problem.test_cases = [tc.model_dump() for tc in data.test_cases]
+
+        db.commit()
+        db.refresh(problem)
+        return CustomProblemService.get_custom_problem_by_id(db, problem.id, teacher_id)
+
+    @staticmethod
+    def publish_problem(
+        db: Session,
+        teacher: User,
+        problem_id: UUID,
+    ) -> CustomProblemResponse:
+        profile = db.scalar(select(TeacherProfile).where(TeacherProfile.user_id == teacher.id))
+        if not profile or not profile.is_verified:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Faculty account requires administrator verification before publishing problems to students.",
+            )
+        return CustomProblemService.update_custom_problem(
+            db=db,
+            problem_id=problem_id,
+            teacher_id=teacher.id,
+            data=CustomProblemUpdate(visibility="CLASS_ONLY"),
         )
 
     @staticmethod

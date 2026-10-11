@@ -8,6 +8,7 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/token_storage.dart';
 import '../../domain/entities/teacher_entity.dart';
 import '../providers/teacher_provider.dart';
+import '../widgets/professor_rating_sheet.dart';
 
 class TeacherProfilePage extends ConsumerStatefulWidget {
   final String teacherId;
@@ -27,10 +28,36 @@ class _TeacherProfilePageState extends ConsumerState<TeacherProfilePage> {
   List<dynamic> _customProblems = [];
   List<dynamic> _quizzes = [];
 
+  bool _isLoadingRatings = true;
+  Map<String, dynamic>? _ratingsSummary;
+
   @override
   void initState() {
     super.initState();
     _loadMentorAssets();
+    _loadRatings();
+  }
+
+  Future<void> _loadRatings() async {
+    try {
+      final token = await TokenStorage.getAccessToken();
+      final summary = await ApiClient.getProfessorRatingsSummary(
+        teacherId: widget.teacherId,
+        accessToken: token,
+      );
+      if (mounted) {
+        setState(() {
+          _ratingsSummary = summary;
+          _isLoadingRatings = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isLoadingRatings = false;
+        });
+      }
+    }
   }
 
   Future<void> _loadMentorAssets() async {
@@ -145,9 +172,12 @@ class _TeacherProfilePageState extends ConsumerState<TeacherProfilePage> {
   Widget build(BuildContext context) {
     final teacherAsync = ref.watch(teacherProfileProvider(widget.teacherId));
     final myTeacherAsync = ref.watch(myTeacherProvider);
+    final myMentorsAsync = ref.watch(myMentorsListProvider);
 
     final isCurrentMentor =
         myTeacherAsync.asData?.value.teacher?.id == widget.teacherId;
+    final isApprovedMentee = isCurrentMentor ||
+        (myMentorsAsync.asData?.value.any((m) => m.teacherId == widget.teacherId) ?? false);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -578,6 +608,10 @@ class _TeacherProfilePageState extends ConsumerState<TeacherProfilePage> {
                           ],
                         ),
                       ),
+                      const SizedBox(height: 20),
+
+                      // Ratings & Reviews Section
+                      _buildRatingsAndReviewsSection(teacher, isApprovedMentee),
                       const SizedBox(height: 24),
 
                       // Action Button
@@ -644,6 +678,269 @@ class _TeacherProfilePageState extends ConsumerState<TeacherProfilePage> {
             );
           },
         ),
+      ),
+    );
+  }
+
+  Widget _buildRatingsAndReviewsSection(TeacherEntity teacher, bool isApprovedMentee) {
+    final avgRating = _ratingsSummary?['avg_rating'] != null
+        ? (_ratingsSummary!['avg_rating'] as num).toDouble()
+        : teacher.ratingAvg;
+    final ratingCount = _ratingsSummary?['rating_count'] != null
+        ? (_ratingsSummary!['rating_count'] as num).toInt()
+        : teacher.ratingCount;
+    final myRating = _ratingsSummary?['my_rating'] as int?;
+    final myComment = _ratingsSummary?['my_comment']?.toString();
+    final ratingsList = (_ratingsSummary?['ratings'] as List?) ?? [];
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.star_rounded, size: 20, color: Color(0xFFD97706)),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Ratings & Reviews',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.star_rounded, size: 16, color: Color(0xFFD97706)),
+                    const SizedBox(width: 4),
+                    Text(
+                      avgRating > 0
+                          ? '${avgRating.toStringAsFixed(1)} ($ratingCount)'
+                          : 'No ratings',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF92400E),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Rate button for approved mentees
+          if (isApprovedMentee) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          myRating != null ? 'Your Rating: $myRating / 5 ★' : 'Rate your mentor',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        if (myComment != null && myComment.isNotEmpty)
+                          Text(
+                            '"$myComment"',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontStyle: FontStyle.italic,
+                              color: Colors.grey.shade600,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          )
+                        else
+                          Text(
+                            'Help fellow students by sharing your mentorship experience.',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.icon(
+                    onPressed: () {
+                      ProfessorRatingSheet.show(
+                        context,
+                        teacherId: widget.teacherId,
+                        teacherName: teacher.displayName,
+                        onSubmitted: () {
+                          _loadRatings();
+                          ref.invalidate(teachersListProvider);
+                          ref.invalidate(teacherProfileProvider(widget.teacherId));
+                        },
+                      );
+                    },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFD97706),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    icon: const Icon(Icons.star_rounded, size: 16),
+                    label: Text(
+                      myRating != null ? 'Edit' : 'Rate',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
+
+          // Reviews List
+          if (_isLoadingRatings)
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (ratingsList.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                'No reviews submitted yet.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+              ),
+            )
+          else ...[
+            Text(
+              'STUDENT REVIEWS (${ratingsList.length})',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.0,
+                color: Colors.grey.shade600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: ratingsList.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 8),
+              itemBuilder: (context, idx) {
+                final r = ratingsList[idx];
+                final studentName = r['student_name']?.toString() ?? 'Student';
+                final rScore = (r['rating'] as num?)?.toInt() ?? 5;
+                final comment = r['comment']?.toString();
+                DateTime? date;
+                if (r['created_at'] != null) {
+                  try {
+                    date = DateTime.parse(r['created_at'].toString());
+                  } catch (_) {}
+                }
+
+                return Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 12,
+                            backgroundColor: Colors.indigo.shade100,
+                            child: Text(
+                              studentName.isNotEmpty ? studentName[0].toUpperCase() : 'S',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.indigo.shade900,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              studentName,
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                            ),
+                          ),
+                          Row(
+                            children: List.generate(5, (starIdx) {
+                              return Icon(
+                                starIdx < rScore ? Icons.star_rounded : Icons.star_border_rounded,
+                                size: 14,
+                                color: const Color(0xFFD97706),
+                              );
+                            }),
+                          ),
+                          if (date != null) ...[
+                            const SizedBox(width: 8),
+                            Text(
+                              '${date.day}/${date.month}/${date.year}',
+                              style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
+                            ),
+                          ],
+                        ],
+                      ),
+                      if (comment != null && comment.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          comment,
+                          style: TextStyle(fontSize: 12, color: Colors.grey.shade700, height: 1.3),
+                        ),
+                      ],
+                    ],
+                  ),
+                );
+              },
+            ),
+          ],
+        ],
       ),
     );
   }

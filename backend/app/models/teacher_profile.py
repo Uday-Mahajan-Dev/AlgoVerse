@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import Boolean, Date, ForeignKey, String, Text
+from sqlalchemy import Boolean, Date, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -63,6 +63,18 @@ class TeacherProfile(BaseModel):
     is_verified: Mapped[bool] = mapped_column(
         Boolean,
         default=False,
+        nullable=False,
+    )
+
+    max_students: Mapped[int] = mapped_column(
+        Integer,
+        default=100,
+        nullable=False,
+    )
+
+    is_accepting_requests: Mapped[bool] = mapped_column(
+        Boolean,
+        default=True,
         nullable=False,
     )
 

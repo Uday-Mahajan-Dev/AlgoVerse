@@ -142,10 +142,12 @@ class CourseProgressModel extends CourseProgressEntity {
     required super.totalLessons,
     required super.completedLessons,
     required super.completionPercentage,
+    super.completedLessonIds = const [],
     super.lastCompletedAt,
   });
 
   factory CourseProgressModel.fromJson(Map<String, dynamic> json) {
+    final rawIds = json['completed_lesson_ids'] as List<dynamic>? ?? [];
     return CourseProgressModel(
       courseId: json['course_id']?.toString() ?? '',
       courseTitle: json['course_title']?.toString() ?? '',
@@ -153,7 +155,10 @@ class CourseProgressModel extends CourseProgressEntity {
       totalLessons: (json['total_lessons'] as num?)?.toInt() ?? 0,
       completedLessons: (json['completed_lessons'] as num?)?.toInt() ?? 0,
       completionPercentage:
-          (json['completion_percentage'] as num?)?.toDouble() ?? 0.0,
+          (json['completion_percentage'] as num?)?.toDouble() ??
+          (json['progress_percentage'] as num?)?.toDouble() ??
+          0.0,
+      completedLessonIds: rawIds.map((e) => e.toString()).toList(),
       lastCompletedAt: json['last_completed_at'] != null
           ? DateTime.tryParse(json['last_completed_at'].toString())
           : null,

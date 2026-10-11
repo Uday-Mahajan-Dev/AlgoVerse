@@ -8,8 +8,16 @@ from app.api.deps import (
     get_current_teacher,
     get_current_user,
     get_db,
+    get_verified_teacher,
 )
 from app.models.user import User
+from app.schemas.mentorship import (
+    ClassroomSettingsRequest,
+    ClassroomSettingsResponse,
+    MentorshipRequestResponse,
+    StudentMentorItem,
+)
+from app.services.mentorship_service import MentorshipService
 from app.schemas.teacher_analytics import (
     AssignmentCreateRequest,
     AssignmentResponse,
@@ -107,17 +115,26 @@ def respond_to_ta_request(
     "/join-class",
     response_model=JoinClassResponse,
     status_code=status.HTTP_200_OK,
-    summary="Join an educator's class using a unique class joining code",
+    summary="Request to join an educator's class using a unique class joining code",
 )
 def join_class(
     request: JoinClassRequest,
     current_student: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return TeacherService.join_class_by_code(
+    # Enforces Phase 1: Students do NOT auto-enroll; submits Mentorship Request
+    req = MentorshipService.create_request(
         db=db,
         student_id=current_student.id,
         class_code=request.class_code,
+    )
+    return JoinClassResponse(
+        message=f"Mentorship request submitted to {req.teacher_name}. Awaiting faculty approval.",
+        teacher_id=req.teacher_id,
+        teacher_name=req.teacher_name,
+        institution_name=req.teacher_institution or "",
+        class_code=req.class_code_attempted or request.class_code,
+        joined_at=req.created_at,
     )
 
 
@@ -147,6 +164,109 @@ def get_my_teacher(
     return TeacherService.get_my_teacher(
         db=db,
         student_id=current_student.id,
+    )
+
+
+@router.get(
+    "/my-mentors",
+    response_model=list[StudentMentorItem],
+    summary="Get all approved mentor professors for current student (multi-professor)",
+)
+def get_my_mentors(
+    current_student: User = Depends(get_current_student),
+    db: Session = Depends(get_db),
+):
+    return MentorshipService.get_my_mentors(
+        db=db,
+        student_id=current_student.id,
+    )
+
+
+# ============================================================
+# MENTORSHIP REQUESTS & CLASSROOM SETTINGS (TEACHER ROLE)
+# ============================================================
+
+@router.get(
+    "/me/mentorship-requests",
+    response_model=list[MentorshipRequestResponse],
+    summary="Get mentorship requests for current teacher, with optional status filter",
+)
+def get_teacher_mentorship_requests(
+    status: str | None = Query(default=None, description="Filter by status: PENDING, APPROVED, REJECTED, ALL"),
+    current_teacher: User = Depends(get_current_teacher),
+    db: Session = Depends(get_db),
+):
+    return MentorshipService.get_teacher_requests(
+        db=db,
+        teacher_id=current_teacher.id,
+        status_filter=status,
+    )
+
+
+@router.post(
+    "/me/mentorship-requests/{request_id}/approve",
+    response_model=MentorshipRequestResponse,
+    summary="Approve a student mentorship request (verified faculty only, checks capacity)",
+)
+def approve_mentorship_request(
+    request_id: UUID,
+    verified_teacher: User = Depends(get_verified_teacher),
+    db: Session = Depends(get_db),
+):
+    return MentorshipService.approve_request(
+        db=db,
+        request_id=request_id,
+        teacher_id=verified_teacher.id,
+    )
+
+
+@router.post(
+    "/me/mentorship-requests/{request_id}/reject",
+    response_model=MentorshipRequestResponse,
+    summary="Reject a student mentorship request (verified faculty only)",
+)
+def reject_mentorship_request(
+    request_id: UUID,
+    verified_teacher: User = Depends(get_verified_teacher),
+    db: Session = Depends(get_db),
+):
+    return MentorshipService.reject_request(
+        db=db,
+        request_id=request_id,
+        teacher_id=verified_teacher.id,
+    )
+
+
+@router.get(
+    "/me/classroom-settings",
+    response_model=ClassroomSettingsResponse,
+    summary="Get classroom capacity settings and current enrollment",
+)
+def get_classroom_settings(
+    current_teacher: User = Depends(get_current_teacher),
+    db: Session = Depends(get_db),
+):
+    return MentorshipService.get_classroom_settings(
+        db=db,
+        teacher_id=current_teacher.id,
+    )
+
+
+@router.patch(
+    "/me/classroom-settings",
+    response_model=ClassroomSettingsResponse,
+    summary="Update classroom max capacity threshold and request intake toggle (verified faculty only)",
+)
+def update_classroom_settings(
+    body: ClassroomSettingsRequest,
+    verified_teacher: User = Depends(get_verified_teacher),
+    db: Session = Depends(get_db),
+):
+    return MentorshipService.update_classroom_settings(
+        db=db,
+        teacher_id=verified_teacher.id,
+        max_students=body.max_students,
+        is_accepting_requests=body.is_accepting_requests,
     )
 
 
@@ -217,6 +337,7 @@ def get_concept_performance_matrix(
 
 from app.schemas.custom_problem import (
     CustomProblemCreate,
+    CustomProblemUpdate,
     CustomProblemResponse,
     CustomProblemStatsResponse,
     CustomProblemSubmissionsResponse,
@@ -261,6 +382,8 @@ def create_custom_problem(
     current_teacher: User = Depends(get_current_teacher),
     db: Session = Depends(get_db),
 ):
+    if request.is_published:
+        get_verified_teacher(current_teacher, db)
     return CustomProblemService.create_custom_problem(
         db=db,
         teacher_id=current_teacher.id,
@@ -297,6 +420,45 @@ def get_custom_problem(
         db=db,
         problem_id=problem_id,
         user_id=current_user.id,
+    )
+
+
+@router.put(
+    "/custom-problems/{problem_id}",
+    response_model=CustomProblemResponse,
+    summary="Update an existing custom problem",
+)
+def update_custom_problem(
+    problem_id: UUID,
+    request: CustomProblemUpdate,
+    current_teacher: User = Depends(get_current_teacher),
+    db: Session = Depends(get_db),
+):
+    if request.is_published is True:
+        get_verified_teacher(current_teacher, db)
+    return CustomProblemService.update_custom_problem(
+        db=db,
+        problem_id=problem_id,
+        teacher_id=current_teacher.id,
+        data=request,
+    )
+
+
+@router.post(
+    "/custom-problems/{problem_id}/publish",
+    response_model=CustomProblemResponse,
+    summary="Publish a custom problem to students (verified faculty only)",
+)
+def publish_custom_problem(
+    problem_id: UUID,
+    verified_teacher: User = Depends(get_verified_teacher),
+    db: Session = Depends(get_db),
+):
+    return CustomProblemService.update_custom_problem(
+        db=db,
+        problem_id=problem_id,
+        teacher_id=verified_teacher.id,
+        data=CustomProblemUpdate(is_published=True),
     )
 
 

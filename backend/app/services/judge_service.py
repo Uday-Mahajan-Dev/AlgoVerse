@@ -75,6 +75,7 @@ class JudgeService:
                 stdin_input=tc.stdin_input,
                 expected_stdout=tc.expected_stdout,
                 order_index=tc.order_index,
+                explanation=tc.explanation,
             )
             for tc in problem.test_cases
             if not tc.is_hidden
@@ -96,13 +97,13 @@ class JudgeService:
         )
 
     @staticmethod
-    def run_trial(
+    async def run_trial(
         db: Session,
         problem_id: UUID,
         code: str,
         language: str,
     ) -> TrialResultResponse:
-        """Run solution trial against public test cases only (No DB record created)."""
+        """Run solution trial against public test cases concurrently (No DB record created)."""
         problem = (
             db.execute(
                 select(Problem)
@@ -162,6 +163,15 @@ class JudgeService:
             )
 
         executor = get_executor()
+        test_inputs = [tc["input"] for tc in public_tcs]
+        exec_results = await executor.execute_batch_async(
+            source_code=code,
+            language=language,
+            test_inputs=test_inputs,
+            time_limit_ms=time_limit_ms,
+            memory_limit_mb=memory_limit_mb,
+        )
+
         test_results: list[TestCaseExecutionResult] = []
         passed_count = 0
         total_time_ms = 0
@@ -169,16 +179,9 @@ class JudgeService:
         final_verdict = "AC"
         compile_output = None
 
-        for idx, tc in enumerate(public_tcs, start=1):
+        for idx, (tc, exec_res) in enumerate(zip(public_tcs, exec_results), start=1):
             input_val = tc["input"]
             expected_val = tc["expected"]
-            exec_res = executor.execute(
-                source_code=code,
-                language=language,
-                stdin_input=input_val,
-                time_limit_ms=time_limit_ms,
-                memory_limit_mb=memory_limit_mb,
-            )
 
             total_time_ms += exec_res.execution_time_ms
             max_memory_kb = max(max_memory_kb, exec_res.memory_used_kb)
@@ -201,7 +204,8 @@ class JudgeService:
                 break
 
             if exec_res.timed_out:
-                final_verdict = "TLE"
+                if final_verdict == "AC":
+                    final_verdict = "TLE"
                 test_results.append(
                     TestCaseExecutionResult(
                         test_index=idx,
@@ -214,10 +218,11 @@ class JudgeService:
                         error_message="Time Limit Exceeded",
                     )
                 )
-                break
+                continue
 
             if exec_res.exit_code != 0:
-                final_verdict = "RE"
+                if final_verdict == "AC":
+                    final_verdict = "RE"
                 test_results.append(
                     TestCaseExecutionResult(
                         test_index=idx,
@@ -230,7 +235,7 @@ class JudgeService:
                         error_message=exec_res.stderr or "Runtime Error",
                     )
                 )
-                break
+                continue
 
             # Compare stdout (trimmed of trailing whitespace)
             clean_actual = exec_res.stdout.strip()
@@ -251,7 +256,8 @@ class JudgeService:
                     )
                 )
             else:
-                final_verdict = "WA"
+                if final_verdict == "AC":
+                    final_verdict = "WA"
                 test_results.append(
                     TestCaseExecutionResult(
                         test_index=idx,
@@ -276,14 +282,14 @@ class JudgeService:
         )
 
     @staticmethod
-    def submit_solution(
+    async def submit_solution(
         db: Session,
         student_id: UUID,
         problem_id: UUID,
         code: str,
         language: str,
     ) -> SubmissionResultResponse:
-        """Submit code solution against ALL test cases (public + hidden) and auto-complete lesson/custom assignment on AC."""
+        """Submit code solution against ALL test cases concurrently and auto-complete lesson/custom assignment on AC."""
         problem = (
             db.execute(
                 select(Problem)
@@ -333,6 +339,15 @@ class JudgeService:
             )
 
         executor = get_executor()
+        test_inputs = [tc["input"] for tc in all_tcs]
+        exec_results = await executor.execute_batch_async(
+            source_code=code,
+            language=language,
+            test_inputs=test_inputs,
+            time_limit_ms=time_limit_ms,
+            memory_limit_mb=memory_limit_mb,
+        )
+
         passed_count = 0
         total_time_ms = 0
         max_memory_kb = 0
@@ -341,40 +356,35 @@ class JudgeService:
         error_message = None
         actual_output = None
 
-        for idx, tc in enumerate(all_tcs, start=1):
+        for idx, (tc, exec_res) in enumerate(zip(all_tcs, exec_results), start=1):
             input_val = tc["input"]
             expected_val = tc["expected"]
             is_hidden = tc.get("is_hidden", False)
-
-            exec_res = executor.execute(
-                source_code=code,
-                language=language,
-                stdin_input=input_val,
-                time_limit_ms=time_limit_ms,
-                memory_limit_mb=memory_limit_mb,
-            )
 
             total_time_ms += exec_res.execution_time_ms
             max_memory_kb = max(max_memory_kb, exec_res.memory_used_kb)
 
             if exec_res.compile_error:
-                final_verdict = "CE"
-                failed_test_index = idx
-                error_message = exec_res.stderr
-                break
+                if final_verdict == "AC":
+                    final_verdict = "CE"
+                    failed_test_index = idx
+                    error_message = exec_res.stderr
+                continue
 
             if exec_res.timed_out:
-                final_verdict = "TLE"
-                failed_test_index = idx
-                error_message = "Time Limit Exceeded"
-                break
+                if final_verdict == "AC":
+                    final_verdict = "TLE"
+                    failed_test_index = idx
+                    error_message = "Time Limit Exceeded"
+                continue
 
             if exec_res.exit_code != 0:
-                final_verdict = "RE"
-                failed_test_index = idx
-                error_message = exec_res.stderr or "Runtime Error"
-                actual_output = exec_res.stdout if not is_hidden else None
-                break
+                if final_verdict == "AC":
+                    final_verdict = "RE"
+                    failed_test_index = idx
+                    error_message = exec_res.stderr or "Runtime Error"
+                    actual_output = exec_res.stdout if not is_hidden else None
+                continue
 
             clean_actual = exec_res.stdout.strip()
             clean_expected = expected_val.strip()
@@ -382,11 +392,11 @@ class JudgeService:
             if clean_actual == clean_expected:
                 passed_count += 1
             else:
-                final_verdict = "WA"
-                failed_test_index = idx
-                error_message = "Wrong Answer"
-                actual_output = clean_actual if not is_hidden else None
-                break
+                if final_verdict == "AC":
+                    final_verdict = "WA"
+                    failed_test_index = idx
+                    error_message = "Wrong Answer"
+                    actual_output = clean_actual if not is_hidden else None
 
         # Handle post-submission actions based on problem type
         is_lesson_completed = False

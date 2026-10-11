@@ -17,6 +17,7 @@ from app.models.quiz import Quiz
 from app.models.student_lesson_activity import StudentLessonActivity
 from app.models.student_teacher import StudentTeacher
 from app.models.submission import Submission
+from app.models.teacher_profile import TeacherProfile
 from app.models.user import User
 from app.schemas.teacher_analytics import (
     AssignmentResponse,
@@ -279,11 +280,18 @@ class TeacherAnalyticsService:
         events.sort(key=lambda x: x.timestamp, reverse=True)
         recent_feed = events[:10]
 
+        profile = db.scalar(
+            select(TeacherProfile).where(TeacherProfile.user_id == teacher_id)
+        )
+
         return TeacherOverviewResponse(
             total_students=total_students,
             active_students=active_students_count,
             avg_course_completion=avg_course_completion,
             total_submissions_today=total_submissions_today,
+            max_students=profile.max_students if profile else 100,
+            is_accepting_requests=profile.is_accepting_requests if profile else True,
+            is_verified=profile.is_verified if profile else False,
             recent_activity_feed=recent_feed,
         )
 

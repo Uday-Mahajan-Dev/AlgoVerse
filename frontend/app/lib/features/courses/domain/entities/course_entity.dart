@@ -109,6 +109,7 @@ class CourseProgressEntity {
   final int totalLessons;
   final int completedLessons;
   final double completionPercentage;
+  final List<String> completedLessonIds;
   final DateTime? lastCompletedAt;
 
   const CourseProgressEntity({
@@ -118,6 +119,7 @@ class CourseProgressEntity {
     required this.totalLessons,
     required this.completedLessons,
     required this.completionPercentage,
+    this.completedLessonIds = const [],
     this.lastCompletedAt,
   });
 }

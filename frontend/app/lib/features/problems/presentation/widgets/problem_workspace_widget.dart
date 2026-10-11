@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../learning/presentation/widgets/ai_tutor_panel.dart';
 import '../../domain/entities/problem.dart';
 import '../providers/problem_provider.dart';
+import 'problem_rating_widget.dart';
 
 class ProblemWorkspaceWidget extends ConsumerStatefulWidget {
   final String lessonSlug;
@@ -570,6 +571,30 @@ class _ProblemWorkspaceWidgetState
                             ],
                           ),
                         ),
+                        if (tc.explanation != null && tc.explanation!.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          RichText(
+                            text: TextSpan(
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF64748B),
+                              ),
+                              children: [
+                                const TextSpan(
+                                  text: 'Explanation: ',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFFD97706),
+                                  ),
+                                ),
+                                TextSpan(
+                                  text: tc.explanation!,
+                                  style: const TextStyle(fontStyle: FontStyle.italic),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -577,6 +602,12 @@ class _ProblemWorkspaceWidgetState
               ),
             );
           }),
+          const SizedBox(height: 20),
+          ProblemRatingWidget(
+            problemId: problem.id,
+            problemKind: 'course',
+            problemTitle: problem.title,
+          ),
         ],
       ),
     );
@@ -1044,7 +1075,7 @@ class _ProblemWorkspaceWidgetState
                             ),
                             const SizedBox(width: 6),
                             Text(
-                              'Test ${tc.testIndex}',
+                              tc.isHidden ? 'Hidden #${tc.testIndex}' : 'Test ${tc.testIndex}',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
@@ -1075,6 +1106,34 @@ class _ProblemWorkspaceWidgetState
   }
 
   Widget _buildTestResultInspector(TestCaseExecutionResult tc) {
+    if (tc.isHidden) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF11111B),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFF313244)),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              tc.passed ? Icons.lock_open_rounded : Icons.lock_rounded,
+              color: tc.passed ? const Color(0xFFA6E3A1) : const Color(0xFFF38BA8),
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Hidden Test #${tc.testIndex} — ${tc.passed ? "Passed" : "Failed"}\nInputs and expected outputs are hidden for student evaluation.',
+                style: const TextStyle(fontSize: 13, color: Color(0xFFCDD6F4)),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),

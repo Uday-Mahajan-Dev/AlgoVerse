@@ -15,9 +15,18 @@ from app.schemas.courses import (
     CourseProgressResponse,
     EnrollmentResponse,
     LessonCompletionResponse,
+    LessonResponse,
+    LessonSnippetUpdateRequest,
 )
 from app.schemas.dashboard import LessonAccessResponse
+from app.schemas.feedback import (
+    LessonFeedbackCreate,
+    LessonFeedbackResponse,
+    LessonFeedbackSummary,
+)
 from app.services.course_service import CourseService
+from app.services.feedback_service import FeedbackService
+
 
 router = APIRouter(tags=["courses"])
 lesson_router = APIRouter(tags=["lessons"])
@@ -119,6 +128,61 @@ def complete_lesson_direct(
     )
 
 
+@lesson_router.post(
+    "/lessons/{lesson_id}/feedback",
+    response_model=LessonFeedbackResponse,
+    summary="Submit or update rating and feedback for a lesson",
+)
+def submit_lesson_feedback(
+    lesson_id: UUID,
+    data: LessonFeedbackCreate,
+    db: Session = Depends(get_db),
+    current_student: User = Depends(get_current_student),
+):
+    return FeedbackService.submit_lesson_feedback(
+        db=db,
+        student_id=current_student.id,
+        lesson_id=lesson_id,
+        data=data,
+    )
+
+
+@lesson_router.get(
+    "/lessons/{lesson_id}/feedback/summary",
+    response_model=LessonFeedbackSummary,
+    summary="Get rating summary and current student review for a lesson",
+)
+def get_lesson_feedback_summary(
+    lesson_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
+):
+    student_id = current_user.id if current_user else None
+    return FeedbackService.get_lesson_feedback_summary(
+        db=db,
+        lesson_id=lesson_id,
+        student_id=student_id,
+    )
+
+
+@lesson_router.put(
+    "/lessons/{lesson_id}/snippets",
+    response_model=LessonResponse,
+    summary="Update multi-language snippets for a visualization lesson",
+)
+def update_lesson_snippets(
+    lesson_id: UUID,
+    payload: LessonSnippetUpdateRequest,
+    db: Session = Depends(get_db),
+    current_student: User = Depends(get_current_student),
+):
+    return CourseService.update_lesson_snippets(
+        db=db,
+        lesson_id=lesson_id,
+        payload=payload,
+    )
+
+
 @router.get(
     "/{slug}",
     response_model=CourseDetailResponse,
@@ -151,6 +215,22 @@ def enroll_in_course(
         db=db,
         student_id=current_student.id,
         course_slug=slug,
+    )
+
+
+@router.delete(
+    "/{slug}/enroll",
+    summary="Drop / un-enroll from a course",
+)
+def drop_course(
+    slug: str,
+    db: Session = Depends(get_db),
+    current_student: User = Depends(get_current_student),
+):
+    return CourseService.drop_course(
+        db=db,
+        student_id=current_student.id,
+        course_identifier=slug,
     )
 
 

@@ -4,8 +4,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../../learning/presentation/widgets/interactive_visualizer_workspace.dart';
 import '../../../problems/presentation/widgets/problem_workspace_widget.dart';
+import '../../../student_dashboard/presentation/providers/student_dashboard_provider.dart';
 import '../../domain/entities/course_entity.dart';
 import '../providers/course_provider.dart';
+import '../widgets/lesson_rating_sheet.dart';
 
 
 class LessonViewPage extends ConsumerStatefulWidget {
@@ -49,7 +51,10 @@ class _LessonViewPageState extends ConsumerState<LessonViewPage> {
       if (!mounted) return;
 
       ref.invalidate(courseDetailProvider(widget.courseSlug));
+      ref.invalidate(courseProgressProvider(widget.courseSlug));
+      ref.invalidate(coursesListProvider);
       ref.invalidate(allStudentProgressProvider);
+      ref.invalidate(studentDashboardProvider);
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -74,7 +79,7 @@ class _LessonViewPageState extends ConsumerState<LessonViewPage> {
     }
   }
 
-  Future<void> _completeLesson(String lessonId) async {
+  Future<void> _completeLesson(String lessonId, [String? lessonTitle]) async {
     if (_isCompleting) return;
     setState(() {
       _isCompleting = true;
@@ -87,7 +92,10 @@ class _LessonViewPageState extends ConsumerState<LessonViewPage> {
       if (!mounted) return;
 
       ref.invalidate(courseDetailProvider(widget.courseSlug));
+      ref.invalidate(courseProgressProvider(widget.courseSlug));
       ref.invalidate(allStudentProgressProvider);
+      ref.invalidate(coursesListProvider);
+      ref.invalidate(studentDashboardProvider);
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -97,6 +105,16 @@ class _LessonViewPageState extends ConsumerState<LessonViewPage> {
           backgroundColor: Colors.green.shade700,
         ),
       );
+
+      // Prompt for rating after completing
+      Future.delayed(const Duration(milliseconds: 600), () {
+        if (!mounted) return;
+        LessonRatingSheet.show(
+          context,
+          lessonId: lessonId,
+          lessonTitle: lessonTitle ?? 'Lesson',
+        );
+      });
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -199,11 +217,24 @@ class _LessonViewPageState extends ConsumerState<LessonViewPage> {
           );
         }
 
+        final currentLesson = targetLesson;
+
         return Scaffold(
           appBar: AppBar(
             title: Text(targetModule?.title ?? course.title),
             elevation: 0,
             actions: [
+              IconButton(
+                tooltip: 'Rate Lesson',
+                icon: const Icon(Icons.star_rounded, color: Color(0xFFF59E0B)),
+                onPressed: () {
+                  LessonRatingSheet.show(
+                    context,
+                    lessonId: currentLesson.id,
+                    lessonTitle: currentLesson.title,
+                  );
+                },
+              ),
               if (course.isEnrolled && targetLesson.isCompleted)
                 Padding(
                   padding: const EdgeInsets.only(right: 16),
@@ -279,7 +310,10 @@ class _LessonViewPageState extends ConsumerState<LessonViewPage> {
                             lessonSlug: targetLesson.slug,
                             onLessonCompleted: () {
                               ref.invalidate(courseDetailProvider(widget.courseSlug));
+                              ref.invalidate(courseProgressProvider(widget.courseSlug));
+                              ref.invalidate(coursesListProvider);
                               ref.invalidate(allStudentProgressProvider);
+                              ref.invalidate(studentDashboardProvider);
                             },
                           ),
                         ],
@@ -321,7 +355,10 @@ class _LessonViewPageState extends ConsumerState<LessonViewPage> {
                             child: FilledButton.icon(
                               onPressed: _isCompleting
                                   ? null
-                                  : () => _completeLesson(targetLesson!.id),
+                                  : () => _completeLesson(
+                                        targetLesson!.id,
+                                        targetLesson.title,
+                                      ),
                               style: FilledButton.styleFrom(
                                 backgroundColor: targetLesson.isCompleted
                                     ? Colors.green.shade700
@@ -361,6 +398,21 @@ class _LessonViewPageState extends ConsumerState<LessonViewPage> {
                                 ),
                               ),
                             ),
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton.outlined(
+                            tooltip: 'Rate Lesson',
+                            icon: const Icon(
+                              Icons.star_rounded,
+                              color: Color(0xFFF59E0B),
+                            ),
+                            onPressed: () {
+                              LessonRatingSheet.show(
+                                context,
+                                lessonId: currentLesson.id,
+                                lessonTitle: currentLesson.title,
+                              );
+                            },
                           ),
                           if (nextLesson != null) ...[
                             const SizedBox(width: 8),

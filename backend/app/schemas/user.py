@@ -74,6 +74,7 @@ class UserResponse(UserBase):
     designation: str | None = None
     subject_expertise: str | None = None
     ta_application_status: str | None = None
+    is_verified: bool | None = None
 
     created_at: datetime
     updated_at: datetime
@@ -133,6 +134,7 @@ class UserResponse(UserBase):
             designation=designation,
             subject_expertise=subject_expertise,
             ta_application_status=ta_application_status,
+            is_verified=getattr(user.teacher_profile, "is_verified", False) if hasattr(user, "teacher_profile") and user.teacher_profile else None,
             created_at=user.created_at,
             updated_at=user.updated_at,
         )

@@ -1152,20 +1152,32 @@ class ApiClient {
     String description = '',
     String visibility = 'CLASS_ONLY',
     int timePerQuestion = 30,
+    String scoringMode = 'FLAT',
+    int? timeLimitSeconds,
+    double minMultiplier = 0.5,
+    double decay = 0.5,
     required List<Map<String, dynamic>> questions,
   }) async {
     final headers = await _authHeaders(token: accessToken);
+    final bodyData = <String, dynamic>{
+      'title': title,
+      'description': description,
+      'visibility': visibility,
+      'time_per_question_seconds': timePerQuestion,
+      'scoring_mode': scoringMode,
+      'min_multiplier': minMultiplier,
+      'decay': decay,
+      'questions': questions,
+    };
+    if (timeLimitSeconds != null) {
+      bodyData['time_limit_seconds'] = timeLimitSeconds;
+    }
+
     final response = await http
         .post(
           Uri.parse('$baseUrl/quizzes'),
           headers: headers,
-          body: jsonEncode({
-            'title': title,
-            'description': description,
-            'visibility': visibility,
-            'time_per_question_seconds': timePerQuestion,
-            'questions': questions,
-          }),
+          body: jsonEncode(bodyData),
         )
         .timeout(AppConstants.requestTimeout);
 
@@ -1371,6 +1383,357 @@ class ApiClient {
         .timeout(AppConstants.requestTimeout);
 
     return _handleListResponse(response);
+  }
+
+  // ============================================================
+  // MENTORSHIP & CLASSROOM CAPACITY (PHASE 1)
+  // ============================================================
+
+  static Future<Map<String, dynamic>> sendMentorshipRequest({
+    required String accessToken,
+    String? teacherId,
+    String? classCode,
+    String? message,
+  }) async {
+    final Map<String, dynamic> payload = {};
+    if (teacherId != null) payload['teacher_id'] = teacherId;
+    if (classCode != null) payload['class_code'] = classCode;
+    if (message != null) payload['message'] = message;
+
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/mentorship/requests'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: jsonEncode(payload),
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<List<dynamic>> getMyMentorshipRequests({
+    required String accessToken,
+  }) async {
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/mentorship/requests/me'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleListResponse(response);
+  }
+
+  static Future<List<dynamic>> getTeacherMentorshipRequests({
+    required String accessToken,
+    String? status,
+  }) async {
+    final uri = Uri.parse('$baseUrl/teachers/me/mentorship-requests').replace(
+      queryParameters: {
+        if (status != null && status.isNotEmpty) 'status': status,
+      },
+    );
+    final response = await http
+        .get(
+          uri,
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleListResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> approveMentorshipRequest({
+    required String accessToken,
+    required String requestId,
+  }) async {
+    final response = await http
+        .post(
+          Uri.parse(
+              '$baseUrl/teachers/me/mentorship-requests/$requestId/approve'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> rejectMentorshipRequest({
+    required String accessToken,
+    required String requestId,
+  }) async {
+    final response = await http
+        .post(
+          Uri.parse(
+              '$baseUrl/teachers/me/mentorship-requests/$requestId/reject'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> getClassroomSettings({
+    required String accessToken,
+  }) async {
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/teachers/me/classroom-settings'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> updateClassroomSettings({
+    required String accessToken,
+    int? maxStudents,
+    bool? isAcceptingRequests,
+  }) async {
+    final Map<String, dynamic> payload = {};
+    if (maxStudents != null) payload['max_students'] = maxStudents;
+    if (isAcceptingRequests != null) {
+      payload['is_accepting_requests'] = isAcceptingRequests;
+    }
+
+    final response = await http
+        .patch(
+          Uri.parse('$baseUrl/teachers/me/classroom-settings'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: jsonEncode(payload),
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<List<dynamic>> getMyMentors({
+    required String accessToken,
+  }) async {
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/teachers/my-mentors'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleListResponse(response);
+  }
+
+  static Future<List<dynamic>> getProfessorsDirectory({
+    String? accessToken,
+    String? searchQuery,
+  }) async {
+    final uri = Uri.parse('$baseUrl/professors').replace(
+      queryParameters: {
+        if (searchQuery != null && searchQuery.isNotEmpty) 'q': searchQuery,
+      },
+    );
+    final headers = <String, String>{
+      'Accept': 'application/json',
+      if (accessToken != null && accessToken.isNotEmpty)
+        'Authorization': 'Bearer $accessToken',
+    };
+    final response = await http
+        .get(
+          uri,
+          headers: headers,
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleListResponse(response);
+  }
+
+  // --- Feedback & Ratings APIs ---
+
+  static Future<Map<String, dynamic>> submitLessonFeedback({
+    required String lessonId,
+    required int rating,
+    String? comment,
+    String? accessToken,
+  }) async {
+    final headers = await _authHeaders(token: accessToken);
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/lessons/$lessonId/feedback'),
+          headers: headers,
+          body: jsonEncode({
+            'rating': rating,
+            if (comment != null && comment.isNotEmpty) 'comment': comment,
+          }),
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> getLessonFeedbackSummary({
+    required String lessonId,
+    String? accessToken,
+  }) async {
+    final headers = await _authHeaders(token: accessToken);
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/lessons/$lessonId/feedback/summary'),
+          headers: headers,
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> submitProblemFeedback({
+    required String problemId,
+    required String problemKind,
+    required int rating,
+    String? comment,
+    String? accessToken,
+  }) async {
+    final headers = await _authHeaders(token: accessToken);
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/problems/$problemId/feedback'),
+          headers: headers,
+          body: jsonEncode({
+            'problem_kind': problemKind,
+            'rating': rating,
+            if (comment != null && comment.isNotEmpty) 'comment': comment,
+          }),
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> getProblemFeedbackSummary({
+    required String problemId,
+    String problemKind = 'course',
+    String? accessToken,
+  }) async {
+    final uri = Uri.parse('$baseUrl/problems/$problemId/feedback/summary').replace(
+      queryParameters: {'problem_kind': problemKind},
+    );
+    final headers = await _authHeaders(token: accessToken);
+    final response = await http
+        .get(
+          uri,
+          headers: headers,
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> submitProfessorRating({
+    required String teacherId,
+    required int rating,
+    String? comment,
+    required String accessToken,
+  }) async {
+    final headers = await _authHeaders(token: accessToken);
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/professors/$teacherId/rate'),
+          headers: headers,
+          body: jsonEncode({
+            'rating': rating,
+            if (comment != null && comment.isNotEmpty) 'comment': comment,
+          }),
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> getProfessorRatingsSummary({
+    required String teacherId,
+    String? accessToken,
+  }) async {
+    final headers = await _authHeaders(token: accessToken);
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/professors/$teacherId/ratings'),
+          headers: headers,
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  // ============================================================
+  // ADMIN FACULTY VERIFICATION GATE
+  // ============================================================
+
+  static Future<List<dynamic>> getPendingEducators({
+    String? accessToken,
+    bool includeAll = false,
+  }) async {
+    final headers = await _authHeaders(token: accessToken);
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/admin/educators/pending?include_all=$includeAll'),
+          headers: headers,
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleListResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> verifyEducator({
+    required String educatorId,
+    String? accessToken,
+  }) async {
+    final headers = await _authHeaders(token: accessToken);
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/admin/educators/$educatorId/verify'),
+          headers: headers,
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> revokeEducator({
+    required String educatorId,
+    String? accessToken,
+  }) async {
+    final headers = await _authHeaders(token: accessToken);
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/admin/educators/$educatorId/revoke'),
+          headers: headers,
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
   }
 }
 

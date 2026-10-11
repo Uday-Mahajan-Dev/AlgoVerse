@@ -1,13 +1,23 @@
 from datetime import datetime
 from uuid import UUID
 from typing import Any
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class TestCaseItem(BaseModel):
     input: str
     expected: str
-    is_hidden: bool = False
+    is_hidden: bool = True
+    explanation: str | None = None
+
+    @model_validator(mode="after")
+    def validate_visible_explanation(self):
+        if not self.is_hidden:
+            if not self.explanation or not self.explanation.strip():
+                raise ValueError("Visible test cases require an explanation (max 200 characters).")
+            if len(self.explanation.strip()) > 200:
+                raise ValueError("Explanation must not exceed 200 characters.")
+        return self
 
 
 class CustomProblemCreate(BaseModel):
@@ -19,6 +29,17 @@ class CustomProblemCreate(BaseModel):
     starter_code_cpp: str | None = ""
     test_cases: list[TestCaseItem] = Field(default_factory=list)
     visibility: str = Field(default="CLASS_ONLY")  # "CLASS_ONLY" | "PUBLIC"
+
+
+class CustomProblemUpdate(BaseModel):
+    title: str | None = Field(None, min_length=3, max_length=200)
+    description: str | None = Field(None, min_length=10)
+    starter_code: str | None = None
+    starter_code_python: str | None = None
+    starter_code_java: str | None = None
+    starter_code_cpp: str | None = None
+    test_cases: list[TestCaseItem] | None = None
+    visibility: str | None = None
 
 
 class CustomProblemResponse(BaseModel):

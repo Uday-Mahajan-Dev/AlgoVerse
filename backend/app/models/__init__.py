@@ -25,3 +25,7 @@ from .quiz_question import QuizQuestion
 from .quiz_attempt import QuizAttempt
 from .notification import Notification
 from .custom_problem_completion import CustomProblemCompletion
+from .mentorship_request import MentorshipRequest
+from .lesson_feedback import LessonFeedback
+from .problem_feedback import ProblemFeedback
+from .professor_rating import ProfessorRating

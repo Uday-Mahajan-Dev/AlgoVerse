@@ -381,6 +381,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             const SizedBox(height: 16),
             Text(
               fullName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
@@ -389,6 +391,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             const SizedBox(height: 4),
             Text(
               '@$username',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey.shade600,
@@ -398,6 +402,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             const SizedBox(height: 4),
             Text(
               email,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 13,
                 color: Colors.grey.shade600,

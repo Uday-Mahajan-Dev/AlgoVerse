@@ -16,6 +16,7 @@ from app.models.user import User
 from app.schemas.quiz import (
     QuizAttemptDetail,
     QuizCreate,
+    QuizUpdate,
     QuizLeaderboardEntry,
     QuizQuestionResponse,
     QuizResponse,
@@ -43,6 +44,10 @@ class QuizService:
             description=data.description.strip() if data.description else "",
             visibility=data.visibility.upper(),
             time_per_question_seconds=data.time_per_question_seconds,
+            scoring_mode=data.scoring_mode.upper(),
+            time_limit_seconds=data.time_limit_seconds,
+            min_multiplier=data.min_multiplier,
+            decay=data.decay,
         )
         db.add(quiz)
         db.flush()
@@ -97,6 +102,10 @@ class QuizService:
             description=quiz.description,
             visibility=quiz.visibility,
             time_per_question_seconds=quiz.time_per_question_seconds,
+            scoring_mode=quiz.scoring_mode,
+            time_limit_seconds=quiz.time_limit_seconds,
+            min_multiplier=quiz.min_multiplier,
+            decay=quiz.decay,
             question_count=len(questions),
             created_at=quiz.created_at,
             questions=[
@@ -308,10 +317,46 @@ class QuizService:
             description=quiz.description,
             visibility=quiz.visibility,
             time_per_question_seconds=quiz.time_per_question_seconds,
+            scoring_mode=quiz.scoring_mode,
+            time_limit_seconds=quiz.time_limit_seconds,
+            min_multiplier=quiz.min_multiplier,
+            decay=quiz.decay,
             question_count=len(sorted_questions),
             created_at=quiz.created_at,
             questions=questions_resp,
         )
+
+    @staticmethod
+    def update_quiz(
+        db: Session,
+        quiz_id: UUID,
+        teacher_id: UUID,
+        data: QuizUpdate,
+    ) -> QuizResponse:
+        quiz = db.scalar(select(Quiz).where(Quiz.id == quiz_id))
+        if not quiz:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
+        if quiz.teacher_id != teacher_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only edit quizzes you created.")
+        if data.title is not None:
+            quiz.title = data.title.strip()
+        if data.description is not None:
+            quiz.description = data.description.strip()
+        if data.visibility is not None:
+            quiz.visibility = data.visibility.upper()
+        if data.time_per_question_seconds is not None:
+            quiz.time_per_question_seconds = data.time_per_question_seconds
+        if data.scoring_mode is not None:
+            quiz.scoring_mode = data.scoring_mode.upper()
+        if data.time_limit_seconds is not None:
+            quiz.time_limit_seconds = data.time_limit_seconds
+        if data.min_multiplier is not None:
+            quiz.min_multiplier = data.min_multiplier
+        if data.decay is not None:
+            quiz.decay = data.decay
+        db.commit()
+        db.refresh(quiz)
+        return QuizService.get_quiz_by_id(db, quiz.id, teacher_id)
 
 
     @staticmethod
@@ -347,7 +392,7 @@ class QuizService:
                 continue
 
             time_spent = min(ans.time_taken_seconds, time_limit)
-            total_time += time_spent
+            total_time += ans.time_taken_seconds
             is_correct = (ans.selected_index == q.correct_option_index)
 
             q_score = 0
@@ -368,11 +413,34 @@ class QuizService:
                 "score": q_score,
             })
 
+        effective_time_limit = quiz.time_limit_seconds or (quiz.time_per_question_seconds * total_questions)
+
+        # Anti-cheat check: reject if time taken exceeds limit by over 25%
+        if effective_time_limit > 0 and total_time > (effective_time_limit * 1.25):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Submission rejected: Quiz time limit ({effective_time_limit}s) exceeded by over 25% ({total_time}s taken).",
+            )
+
+        raw_score = total_score
+        if quiz.scoring_mode == "TIME_MULTIPLIER" and effective_time_limit > 0:
+            time_ratio = total_time / effective_time_limit
+            factor = max(quiz.min_multiplier, 1.0 - quiz.decay * time_ratio)
+            multiplier_applied = round(factor, 4)
+            final_score = int(round(raw_score * factor))
+        else:
+            multiplier_applied = 1.0
+            final_score = raw_score
+
         attempt = QuizAttempt(
             quiz_id=quiz.id,
             student_id=student_id,
-            score=total_score,
+            score=final_score,
+            raw_score=raw_score,
+            final_score=final_score,
             total_time_seconds=total_time,
+            time_taken_seconds=total_time,
+            multiplier_applied=multiplier_applied,
             answers=answers_record,
             submitted_at=datetime.now(timezone.utc),
         )
@@ -396,13 +464,13 @@ class QuizService:
 
         # Calculate rank
         all_scores = db.scalars(
-            select(QuizAttempt.score)
+            select(QuizAttempt.final_score)
             .where(QuizAttempt.quiz_id == quiz.id)
-            .order_by(QuizAttempt.score.desc(), QuizAttempt.total_time_seconds.asc())
+            .order_by(QuizAttempt.final_score.desc(), QuizAttempt.time_taken_seconds.asc())
         ).all()
         rank = 1
         for s in all_scores:
-            if s > total_score:
+            if s > final_score:
                 rank += 1
             else:
                 break
@@ -412,7 +480,11 @@ class QuizService:
         return QuizSubmitResponse(
             attempt_id=attempt.id,
             quiz_id=quiz.id,
-            score=total_score,
+            score=final_score,
+            raw_score=raw_score,
+            final_score=final_score,
+            multiplier_applied=multiplier_applied,
+            time_taken_seconds=total_time,
             max_possible_score=max_score,
             correct_count=correct_count,
             total_questions=total_questions,
@@ -438,7 +510,7 @@ class QuizService:
             select(QuizAttempt)
             .where(QuizAttempt.quiz_id == quiz_id)
             .options(selectinload(QuizAttempt.student))
-            .order_by(desc(QuizAttempt.score), QuizAttempt.total_time_seconds.asc())
+            .order_by(desc(QuizAttempt.final_score), QuizAttempt.time_taken_seconds.asc())
         )
 
         # If CLASS_ONLY and requester is not the teacher, filter to teacher's class students
@@ -480,8 +552,12 @@ class QuizService:
                     student_id=att.student_id,
                     student_name=student_name,
                     avatar_url=avatar_url,
-                    score=att.score,
-                    total_time_seconds=att.total_time_seconds,
+                    score=att.final_score if att.final_score is not None else att.score,
+                    final_score=att.final_score if att.final_score is not None else att.score,
+                    raw_score=att.raw_score if att.raw_score is not None else att.score,
+                    multiplier_applied=att.multiplier_applied if att.multiplier_applied is not None else 1.0,
+                    total_time_seconds=att.time_taken_seconds if att.time_taken_seconds is not None else att.total_time_seconds,
+                    time_taken_seconds=att.time_taken_seconds if att.time_taken_seconds is not None else att.total_time_seconds,
                     submitted_at=att.submitted_at,
                 )
             )

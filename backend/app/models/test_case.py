@@ -36,8 +36,13 @@ class TestCase(Base):
 
     is_hidden: Mapped[bool] = mapped_column(
         Boolean,
-        default=False,
+        default=True,
         nullable=False,
+    )
+
+    explanation: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
     )
 
     order_index: Mapped[int] = mapped_column(

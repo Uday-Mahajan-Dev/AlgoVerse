@@ -6,12 +6,14 @@ class PublicTestCase {
   final String stdinInput;
   final String expectedStdout;
   final int orderIndex;
+  final String? explanation;
 
   const PublicTestCase({
     required this.id,
     required this.stdinInput,
     required this.expectedStdout,
     required this.orderIndex,
+    this.explanation,
   });
 }
 

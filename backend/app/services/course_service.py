@@ -18,6 +18,7 @@ from app.schemas.courses import (
     EnrollmentResponse,
     LessonCompletionResponse,
     LessonResponse,
+    LessonSnippetUpdateRequest,
     ModuleResponse,
 )
 from app.schemas.dashboard import LessonAccessResponse
@@ -79,29 +80,45 @@ class CourseService:
         return result
 
     @staticmethod
+    def _get_course_by_identifier(
+        db: Session,
+        identifier: str,
+        load_details: bool = False,
+    ) -> Course | None:
+        """Find course by UUID string or slug."""
+        stmt = select(Course)
+        if load_details:
+            stmt = stmt.options(
+                selectinload(Course.modules).selectinload(CourseModule.lessons),
+                selectinload(Course.enrollments),
+            )
+        try:
+            val = UUID(identifier)
+            course = db.execute(stmt.where(Course.id == val)).scalars().first()
+            if course:
+                return course
+        except (ValueError, AttributeError):
+            pass
+
+        return db.execute(stmt.where(Course.slug == identifier)).scalars().first()
+
+    @staticmethod
     def get_course_detail(
         db: Session,
         course_slug: str,
         user_id: UUID | None = None,
     ) -> CourseDetailResponse:
-        """Fetch a specific course by slug with explicitly ordered modules and lessons."""
-        course = (
-            db.execute(
-                select(Course)
-                .where(Course.slug == course_slug)
-                .options(
-                    selectinload(Course.modules).selectinload(CourseModule.lessons),
-                    selectinload(Course.enrollments),
-                )
-            )
-            .scalars()
-            .first()
+        """Fetch a specific course by slug or ID with explicitly ordered modules and lessons."""
+        course = CourseService._get_course_by_identifier(
+            db=db,
+            identifier=course_slug,
+            load_details=True,
         )
 
         if not course:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Course with slug '{course_slug}' not found.",
+                detail=f"Course with identifier '{course_slug}' not found.",
             )
 
         # Check user enrollment
@@ -159,13 +176,18 @@ class CourseService:
                 if is_completed:
                     completed_lessons_count += 1
 
+                content_payload = (
+                    CourseService.normalize_visualization_content(lesson.content_json)
+                    if lesson.content_type == "VISUALIZATION"
+                    else (lesson.content_json or {})
+                )
                 lesson_responses.append(
                     LessonResponse(
                         id=lesson.id,
                         title=lesson.title,
                         slug=lesson.slug,
                         content_type=lesson.content_type,
-                        content_json=lesson.content_json or {},
+                        content_json=content_payload,
                         order_index=lesson.order_index,
                         estimated_minutes=lesson.estimated_minutes,
                         is_completed=is_completed,
@@ -213,17 +235,13 @@ class CourseService:
         student_id: UUID,
         course_slug: str,
     ) -> EnrollmentResponse:
-        """Enroll a student in a course (idempotent)."""
-        course = (
-            db.execute(select(Course).where(Course.slug == course_slug))
-            .scalars()
-            .first()
-        )
+        """Enroll a student in a course (idempotent). Supports slug or ID."""
+        course = CourseService._get_course_by_identifier(db, course_slug)
 
         if not course:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Course with slug '{course_slug}' not found.",
+                detail=f"Course with identifier '{course_slug}' not found.",
             )
 
         if not course.is_published:
@@ -269,28 +287,57 @@ class CourseService:
         )
 
     @staticmethod
+    def drop_course(
+        db: Session,
+        student_id: UUID,
+        course_identifier: str,
+    ) -> dict[str, str]:
+        """Drop / un-enroll from a course."""
+        course = CourseService._get_course_by_identifier(db, course_identifier)
+
+        if not course:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Course with identifier '{course_identifier}' not found.",
+            )
+
+        enrollment = db.scalar(
+            select(CourseEnrollment).where(
+                CourseEnrollment.student_id == student_id,
+                CourseEnrollment.course_id == course.id,
+            )
+        )
+
+        if not enrollment:
+            return {
+                "course_id": str(course.id),
+                "message": "Not enrolled in this course",
+            }
+
+        db.delete(enrollment)
+        db.commit()
+        return {
+            "course_id": str(course.id),
+            "message": "Successfully dropped course",
+        }
+
+    @staticmethod
     def get_student_progress(
         db: Session,
         student_id: UUID,
         course_slug: str,
     ) -> CourseProgressResponse:
-        """Get learning progress for a specific course for a student."""
-        course = (
-            db.execute(
-                select(Course)
-                .where(Course.slug == course_slug)
-                .options(
-                    selectinload(Course.modules).selectinload(CourseModule.lessons),
-                )
-            )
-            .scalars()
-            .first()
+        """Get learning progress for a specific course for a student. Supports slug or ID."""
+        course = CourseService._get_course_by_identifier(
+            db=db,
+            identifier=course_slug,
+            load_details=True,
         )
 
         if not course:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Course with slug '{course_slug}' not found.",
+                detail=f"Course with identifier '{course_slug}' not found.",
             )
 
         all_lesson_ids = [
@@ -308,6 +355,8 @@ class CourseService:
                 total_lessons=0,
                 completed_lessons=0,
                 completion_percentage=0.0,
+                progress_percentage=0.0,
+                completed_lesson_ids=[],
                 last_completed_at=None,
             )
 
@@ -325,6 +374,7 @@ class CourseService:
         )
 
         completed_count = len(completions)
+        completed_ids = [c.lesson_id for c in completions]
         last_completed_at = completions[0].completed_at if completions else None
         completion_percentage = round((completed_count / total_lessons) * 100.0, 1)
 
@@ -335,6 +385,8 @@ class CourseService:
             total_lessons=total_lessons,
             completed_lessons=completed_count,
             completion_percentage=completion_percentage,
+            progress_percentage=completion_percentage,
+            completed_lesson_ids=completed_ids,
             last_completed_at=last_completed_at,
         )
 
@@ -382,6 +434,8 @@ class CourseService:
                         total_lessons=0,
                         completed_lessons=0,
                         completion_percentage=0.0,
+                        progress_percentage=0.0,
+                        completed_lesson_ids=[],
                         last_completed_at=None,
                     )
                 )
@@ -401,6 +455,7 @@ class CourseService:
             )
 
             completed_count = len(completions)
+            completed_ids = [c.lesson_id for c in completions]
             last_completed_at = completions[0].completed_at if completions else None
             completion_percentage = round((completed_count / total_lessons) * 100.0, 1)
 
@@ -412,6 +467,8 @@ class CourseService:
                     total_lessons=total_lessons,
                     completed_lessons=completed_count,
                     completion_percentage=completion_percentage,
+                    progress_percentage=completion_percentage,
+                    completed_lesson_ids=completed_ids,
                     last_completed_at=last_completed_at,
                 )
             )
@@ -598,5 +655,62 @@ class CourseService:
             lesson_id=lesson_id,
             last_accessed_at=activity.last_accessed_at.isoformat(),
             message="Lesson access recorded",
+        )
+
+    @staticmethod
+    def normalize_visualization_content(content: dict | None) -> dict:
+        """Ensure code_snippets map, default_language, and line_maps exist on visualization content."""
+        if not isinstance(content, dict):
+            return {}
+        res = dict(content)
+        code_snippets = res.get("code_snippets")
+        if not isinstance(code_snippets, dict):
+            single = res.get("code_snippet")
+            res["code_snippets"] = {"python": str(single)} if single else {}
+        elif res.get("code_snippet") and "python" not in code_snippets:
+            res["code_snippets"]["python"] = str(res["code_snippet"])
+
+        if "default_language" not in res:
+            res["default_language"] = "python"
+
+        if "line_maps" not in res or not isinstance(res.get("line_maps"), dict):
+            single_map = res.get("line_map")
+            res["line_maps"] = {"python": single_map} if isinstance(single_map, dict) else {}
+
+        return res
+
+    @staticmethod
+    def update_lesson_snippets(
+        db: Session,
+        lesson_id: UUID,
+        payload: LessonSnippetUpdateRequest,
+    ) -> LessonResponse:
+        """Authoring endpoint: updates multi-language code snippets and line maps on a visualization lesson."""
+        lesson = db.scalar(select(Lesson).where(Lesson.id == lesson_id))
+        if not lesson:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Lesson {lesson_id} not found",
+            )
+        current_content = dict(lesson.content_json or {})
+        current_content["code_snippets"] = payload.code_snippets
+        if payload.line_maps is not None:
+            current_content["line_maps"] = payload.line_maps
+        current_content["default_language"] = payload.default_language
+        if "python" in payload.code_snippets:
+            current_content["code_snippet"] = payload.code_snippets["python"]
+
+        lesson.content_json = current_content
+        db.commit()
+        db.refresh(lesson)
+        return LessonResponse(
+            id=lesson.id,
+            title=lesson.title,
+            slug=lesson.slug,
+            content_type=lesson.content_type,
+            content_json=current_content,
+            order_index=lesson.order_index,
+            estimated_minutes=lesson.estimated_minutes,
+            is_completed=False,
         )
 

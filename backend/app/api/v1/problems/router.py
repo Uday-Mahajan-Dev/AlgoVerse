@@ -1,12 +1,27 @@
 from typing import List
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, get_db
+from app.api.deps import (
+    get_current_user,
+    get_db,
+    get_optional_current_user,
+    get_verified_teacher,
+)
 from app.models.user import User
-from app.schemas.custom_problem import CustomProblemCreate, CustomProblemResponse
+from app.schemas.custom_problem import (
+    CustomProblemCreate,
+    CustomProblemUpdate,
+    CustomProblemResponse,
+)
+from app.schemas.feedback import (
+    ProblemFeedbackCreate,
+    ProblemFeedbackResponse,
+    ProblemFeedbackSummary,
+)
+from app.services.feedback_service import FeedbackService
 from app.schemas.problem import (
     CodeExecutionRequest,
     ProblemDetailResponse,
@@ -53,6 +68,40 @@ def get_custom_problem(
     )
 
 
+@router.put("/custom/{problem_id}", response_model=CustomProblemResponse)
+def update_custom_problem(
+    problem_id: UUID,
+    request: CustomProblemUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Update custom problem details and test cases.
+    """
+    return CustomProblemService.update_custom_problem(
+        db=db,
+        problem_id=problem_id,
+        teacher_id=current_user.id,
+        data=request,
+    )
+
+
+@router.post("/custom/{problem_id}/publish", response_model=CustomProblemResponse)
+def publish_custom_problem(
+    problem_id: UUID,
+    verified_teacher: User = Depends(get_verified_teacher),
+    db: Session = Depends(get_db),
+):
+    """
+    Publish a custom problem to students (verified faculty only).
+    """
+    return CustomProblemService.publish_problem(
+        db=db,
+        teacher=verified_teacher,
+        problem_id=problem_id,
+    )
+
+
 
 @router.get("/executor-status")
 def check_executor_status(
@@ -84,7 +133,7 @@ def get_problem_for_lesson(
 
 
 @router.post("/{problem_id}/run", response_model=TrialResultResponse)
-def run_trial(
+async def run_trial(
     problem_id: UUID,
     request: CodeExecutionRequest,
     db: Session = Depends(get_db),
@@ -95,7 +144,7 @@ def run_trial(
     Does not save a submission record to the database.
     """
     try:
-        result = JudgeService.run_trial(
+        result = await JudgeService.run_trial(
             db=db,
             problem_id=problem_id,
             code=request.code,
@@ -112,7 +161,7 @@ def run_trial(
 
 
 @router.post("/{problem_id}/submit", response_model=SubmissionResultResponse)
-def submit_solution(
+async def submit_solution(
     problem_id: UUID,
     request: CodeExecutionRequest,
     db: Session = Depends(get_db),
@@ -123,7 +172,7 @@ def submit_solution(
     Saves a Submission record and marks the lesson complete if Accepted (AC).
     """
     try:
-        result = JudgeService.submit_solution(
+        result = await JudgeService.submit_solution(
             db=db,
             student_id=current_user.id,
             problem_id=problem_id,
@@ -154,3 +203,43 @@ def get_submissions(
         student_id=current_user.id,
         problem_id=problem_id,
     )
+
+
+@router.post(
+    "/{problem_id}/feedback",
+    response_model=ProblemFeedbackResponse,
+    summary="Submit or update rating and feedback for a problem (course or custom)",
+)
+def submit_problem_feedback(
+    problem_id: UUID,
+    data: ProblemFeedbackCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return FeedbackService.submit_problem_feedback(
+        db=db,
+        student_id=current_user.id,
+        problem_id=problem_id,
+        data=data,
+    )
+
+
+@router.get(
+    "/{problem_id}/feedback/summary",
+    response_model=ProblemFeedbackSummary,
+    summary="Get rating summary and current student review for a problem",
+)
+def get_problem_feedback_summary(
+    problem_id: UUID,
+    problem_kind: str = Query(default="course", description="'course' or 'custom'"),
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
+):
+    student_id = current_user.id if current_user else None
+    return FeedbackService.get_problem_feedback_summary(
+        db=db,
+        problem_id=problem_id,
+        problem_kind=problem_kind,
+        student_id=student_id,
+    )
+

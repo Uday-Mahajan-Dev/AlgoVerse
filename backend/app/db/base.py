@@ -17,3 +17,7 @@ from app.models.problem import Problem
 from app.models.test_case import TestCase
 from app.models.submission import Submission
 from app.models.assignment import Assignment
+from app.models.mentorship_request import MentorshipRequest
+from app.models.lesson_feedback import LessonFeedback
+from app.models.problem_feedback import ProblemFeedback
+from app.models.professor_rating import ProfessorRating

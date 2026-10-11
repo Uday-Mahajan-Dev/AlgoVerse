@@ -10,6 +10,8 @@ import '../providers/teacher_analytics_provider.dart';
 import '../widgets/assign_homework_dialog.dart';
 import '../widgets/teacher_sidebar.dart';
 import '../widgets/teacher_top_bar.dart';
+import '../../../teachers/domain/entities/teacher_entity.dart';
+import '../../../teachers/presentation/providers/teacher_provider.dart';
 
 class TeacherDashboardPage extends ConsumerStatefulWidget {
   const TeacherDashboardPage({super.key});
@@ -57,6 +59,222 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
     }
   }
 
+  Future<void> _respondToMentorshipRequest(String requestId, bool approve) async {
+    try {
+      final token = await TokenStorage.getAccessToken();
+      if (token == null || token.isEmpty) return;
+
+      final res = approve
+          ? await ApiClient.approveMentorshipRequest(
+              accessToken: token, requestId: requestId)
+          : await ApiClient.rejectMentorshipRequest(
+              accessToken: token, requestId: requestId);
+
+      if (!mounted) return;
+
+      ref.invalidate(teacherMentorshipRequestsProvider);
+      ref.invalidate(teacherStudentsProvider);
+      ref.invalidate(teacherOverviewProvider);
+      ref.invalidate(classroomSettingsProvider);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(res['message']?.toString() ??
+              (approve
+                  ? 'Student mentorship request approved!'
+                  : 'Mentorship request rejected.')),
+          backgroundColor:
+              approve ? const Color(0xFF10B981) : Colors.red.shade700,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceAll('Exception: ', '').trim()),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    }
+  }
+
+  void _showClassroomSettingsDialog(
+      BuildContext context, int currentMax, bool currentAccepting) {
+    int maxStudents = currentMax;
+    bool isAccepting = currentAccepting;
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20)),
+              title: const Row(
+                children: [
+                  Icon(Icons.tune_rounded, color: Colors.indigo),
+                  SizedBox(width: 10),
+                  Text('Classroom Settings',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 18)),
+                ],
+              ),
+              content: SizedBox(
+                width: 440,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Control how students join your classroom and manage capacity limits.',
+                      style: TextStyle(
+                          fontSize: 13, color: Colors.grey.shade600),
+                    ),
+                    const SizedBox(height: 20),
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment:
+                                MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Max Classroom Capacity:',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.w600, fontSize: 14),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.indigo.shade50,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                      color: Colors.indigo.shade200),
+                                ),
+                                child: Text(
+                                  '$maxStudents students',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                    color: Colors.indigo.shade900,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Slider(
+                            value: maxStudents.toDouble(),
+                            min: 10,
+                            max: 500,
+                            divisions: 49,
+                            activeColor: Colors.indigo,
+                            label: '$maxStudents',
+                            onChanged: (val) {
+                              setDialogState(() {
+                                maxStudents = val.round();
+                              });
+                            },
+                          ),
+                          Text(
+                            'When this limit is reached, new student requests will be blocked automatically.',
+                            style: TextStyle(
+                                fontSize: 11, color: Colors.grey.shade500),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text(
+                          'Accept New Requests',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w600, fontSize: 14),
+                        ),
+                        subtitle: Text(
+                          'Toggle off if you wish to temporarily pause new student applications.',
+                          style: TextStyle(
+                              fontSize: 12, color: Colors.grey.shade500),
+                        ),
+                        value: isAccepting,
+                        activeThumbColor: const Color(0xFF10B981),
+                        onChanged: (val) {
+                          setDialogState(() {
+                            isAccepting = val;
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  style:
+                      FilledButton.styleFrom(backgroundColor: Colors.indigo),
+                  onPressed: () async {
+                    final messenger = ScaffoldMessenger.of(context);
+                    Navigator.of(ctx).pop();
+                    try {
+                      final token = await TokenStorage.getAccessToken();
+                      if (token == null) return;
+                      await ApiClient.updateClassroomSettings(
+                        accessToken: token,
+                        maxStudents: maxStudents,
+                        isAcceptingRequests: isAccepting,
+                      );
+                      ref.invalidate(classroomSettingsProvider);
+                      ref.invalidate(teacherOverviewProvider);
+                      messenger.showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                              'Classroom settings updated successfully!'),
+                          backgroundColor: Color(0xFF10B981),
+                        ),
+                      );
+                    } catch (e) {
+                      messenger.showSnackBar(
+                        SnackBar(
+                          content: Text(e
+                              .toString()
+                              .replaceAll('Exception: ', '')
+                              .trim()),
+                          backgroundColor: Colors.red.shade700,
+                        ),
+                      );
+                    }
+                  },
+                  child: const Text('Save Settings'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final overviewAsync = ref.watch(teacherOverviewProvider);
@@ -65,6 +283,8 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
     final conceptsAsync = ref.watch(teacherConceptsProvider);
     final assignmentsAsync = ref.watch(teacherAssignmentsProvider);
     final taRequestsAsync = ref.watch(teacherTARequestsProvider);
+    final mentorshipRequestsAsync =
+        ref.watch(teacherMentorshipRequestsProvider);
     final createdProblemsAsync = ref.watch(teacherCreatedProblemsProvider);
     final createdQuizzesAsync = ref.watch(teacherCreatedQuizzesProvider);
 
@@ -107,8 +327,21 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             // Header & Action Bar
-                            _buildHeader(context),
+                            _buildHeader(context, overviewAsync.value),
                             const SizedBox(height: 24),
+
+                            // Mentorship Requests Inbox (Phase 1)
+                            mentorshipRequestsAsync.when(
+                              data: (requests) => _buildMentorshipRequestsCard(
+                                context,
+                                requests,
+                                overviewAsync.value?.totalStudents ?? 0,
+                                overviewAsync.value?.maxStudents ?? 100,
+                                isVerified: overviewAsync.value?.isVerified ?? true,
+                              ),
+                              loading: () => const SizedBox.shrink(),
+                              error: (e, s) => const SizedBox.shrink(),
+                            ),
 
                             // TA Approval Requests (if any)
                             taRequestsAsync.when(
@@ -406,14 +639,316 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildMentorshipRequestsCard(
+    BuildContext context,
+    List<MentorshipRequestEntity> requests,
+    int currentEnrolled,
+    int maxCapacity, {
+    bool isVerified = true,
+  }) {
+    final pending = requests.where((r) => r.isPending).toList();
+    if (pending.isEmpty) return const SizedBox.shrink();
+
+    final isAtCapacity = currentEnrolled >= maxCapacity;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24),
+      child: Card(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(
+            color: isAtCapacity ? Colors.red.shade300 : Colors.indigo.shade300,
+            width: 1.5,
+          ),
+        ),
+        color: isAtCapacity
+            ? Colors.red.shade50.withValues(alpha: 0.5)
+            : Colors.indigo.shade50.withValues(alpha: 0.5),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: isAtCapacity
+                          ? Colors.red.shade100
+                          : Colors.indigo.shade100,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.person_add_alt_1_rounded,
+                      color: isAtCapacity
+                          ? Colors.red.shade900
+                          : Colors.indigo.shade900,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              'Pending Mentorship Requests (${pending.length})',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: isAtCapacity
+                                    ? Colors.red.shade900
+                                    : const Color(0xFF1E1B4B),
+                              ),
+                            ),
+                            const Spacer(),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: isAtCapacity
+                                    ? Colors.red.shade100
+                                    : Colors.indigo.shade100,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'Capacity: $currentEnrolled / $maxCapacity',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: isAtCapacity
+                                      ? Colors.red.shade900
+                                      : Colors.indigo.shade900,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          isAtCapacity
+                              ? 'Classroom capacity is full ($currentEnrolled/$maxCapacity). Adjust capacity or reject requests to enroll new students.'
+                              : 'Students who requested to join your classroom roster via class code or professor directory.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isAtCapacity
+                                ? Colors.red.shade800
+                                : Colors.indigo.shade800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: pending.length,
+                separatorBuilder: (ctx, i) => const SizedBox(height: 12),
+                itemBuilder: (context, index) {
+                  final req = pending[index];
+                  final name = req.studentName.isNotEmpty
+                      ? req.studentName
+                      : req.studentUsername;
+
+                  return Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: Colors.indigo.shade100),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 18,
+                              backgroundColor: Colors.indigo.shade100,
+                              child: Text(
+                                name.isNotEmpty ? name[0].toUpperCase() : 'S',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.indigo.shade900,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    name,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${req.studentEmail != null && req.studentEmail!.isNotEmpty ? "${req.studentEmail} • " : ""}@${req.studentUsername}',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (req.classCodeAttempted != null &&
+                                req.classCodeAttempted!.isNotEmpty)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: Colors.purple.shade50,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                      color: Colors.purple.shade200),
+                                ),
+                                child: Text(
+                                  'Code: ${req.classCodeAttempted}',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.purple.shade900,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        if (req.message != null && req.message!.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              '"${req.message}"',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontStyle: FontStyle.italic,
+                                color: Colors.grey.shade700,
+                              ),
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: !isVerified
+                                  ? null
+                                  : () =>
+                                      _respondToMentorshipRequest(req.id, false),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.red.shade700,
+                                side: BorderSide(color: Colors.red.shade300),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 8),
+                              ),
+                              icon: const Icon(Icons.close_rounded, size: 16),
+                              label: const Text('Reject',
+                                  style: TextStyle(fontSize: 12)),
+                            ),
+                            const SizedBox(width: 10),
+                            FilledButton.icon(
+                              onPressed: (isAtCapacity || !isVerified)
+                                  ? null
+                                  : () => _respondToMentorshipRequest(
+                                      req.id, true),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: const Color(0xFF10B981),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 8),
+                              ),
+                              icon: const Icon(Icons.check_rounded, size: 16),
+                              label: Text(
+                                !isVerified
+                                    ? 'Verify Req'
+                                    : (isAtCapacity ? 'Roster Full' : 'Approve Mentee'),
+                                style: const TextStyle(
+                                    fontSize: 12, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(
+      BuildContext context, TeacherOverviewEntity? overview) {
     final userProfileAsync = ref.watch(currentUserProfileProvider);
     final classCode =
         userProfileAsync.value?['class_code']?.toString() ?? '';
+    final isVerified = overview?.isVerified ??
+        (userProfileAsync.value?['is_verified'] as bool? ?? true);
+    final maxCapacity = overview?.maxStudents ?? 100;
+    final totalEnrolled = overview?.totalStudents ?? 0;
+    final isAccepting = overview?.isAcceptingRequests ?? true;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (!isVerified) ...[
+          Container(
+            margin: const EdgeInsets.only(bottom: 20),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.amber.shade50,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.amber.shade300),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.shield_moon_rounded,
+                    color: Colors.amber.shade900, size: 28),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Faculty Account Pending Verification',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF78350F),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Your educator profile is awaiting administrator verification. Mentorship approvals and public features are guarded until verified.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.amber.shade900,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         Wrap(
           spacing: 16,
           runSpacing: 12,
@@ -437,33 +972,60 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
                 ),
               ],
             ),
-            FilledButton.icon(
-              onPressed: () {
-                showDialog(
-                  context: context,
-                  builder: (ctx) => const AssignHomeworkDialog(),
-                );
-              },
-              style: FilledButton.styleFrom(
-                backgroundColor: Colors.indigo,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () => _showClassroomSettingsDialog(
+                    context,
+                    maxCapacity,
+                    isAccepting,
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF0F172A),
+                    side: BorderSide(color: Colors.grey.shade300),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  icon: const Icon(Icons.tune_rounded, size: 18),
+                  label: const Text(
+                    'Classroom Settings',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
                 ),
-              ),
-              icon: const Icon(Icons.assignment_add, size: 18),
-              label: const Text(
-                'Assign Homework',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
+                FilledButton.icon(
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (ctx) => const AssignHomeworkDialog(),
+                    );
+                  },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.indigo,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  icon: const Icon(Icons.assignment_add, size: 18),
+                  label: const Text(
+                    'Assign Homework',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
         if (classCode.isNotEmpty) ...[
           const SizedBox(height: 16),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
               color: Colors.purple.shade50,
               borderRadius: BorderRadius.circular(14),
@@ -491,6 +1053,7 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
                       Wrap(
                         crossAxisAlignment: WrapCrossAlignment.center,
                         spacing: 8,
+                        runSpacing: 4,
                         children: [
                           const Text(
                             'Your Class Joining Code:',
@@ -517,11 +1080,48 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
                               ),
                             ),
                           ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: totalEnrolled >= maxCapacity
+                                  ? Colors.red.shade100
+                                  : Colors.indigo.shade100,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              'Enrolled: $totalEnrolled / $maxCapacity students',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: totalEnrolled >= maxCapacity
+                                    ? Colors.red.shade900
+                                    : Colors.indigo.shade900,
+                              ),
+                            ),
+                          ),
+                          if (!isAccepting)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.shade100,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'Requests Paused',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.amber.shade900,
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Share this code with your students to automatically link them to your dashboard roster.',
+                        'Share this code with students. Entering it sends a request to your inbox for approval.',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.purple.shade900,
@@ -652,17 +1252,23 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF0F172A),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF0F172A),
+                  ),
                 ),
               ),
               const SizedBox(height: 2),
               Text(
                 title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
@@ -671,6 +1277,8 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
               ),
               Text(
                 subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
               ),
             ],
@@ -2535,16 +3143,22 @@ class _ProblemStatsSheetState extends State<_ProblemStatsSheet> {
         children: [
           Icon(icon, color: color.shade800, size: 20),
           const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: color.shade900,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: color.shade900,
+              ),
             ),
           ),
           Text(
             label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(fontSize: 11, color: color.shade800),
           ),
         ],

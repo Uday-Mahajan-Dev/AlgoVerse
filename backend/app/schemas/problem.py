@@ -8,6 +8,7 @@ class PublicTestCaseResponse(BaseModel):
     stdin_input: str
     expected_stdout: str
     order_index: int
+    explanation: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

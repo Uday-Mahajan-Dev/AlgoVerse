@@ -12,6 +12,11 @@ class TeacherModel extends TeacherEntity {
     super.professionalBio,
     super.country,
     required super.studentCount,
+    super.maxStudents = 100,
+    super.isAcceptingRequests = true,
+    super.isVerified = true,
+    super.ratingAvg = 0.0,
+    super.ratingCount = 0,
     required super.specialty,
     super.institutionName,
     super.designation,
@@ -39,7 +44,12 @@ class TeacherModel extends TeacherEntity {
       bio: json['bio'] as String?,
       professionalBio: (json['professional_bio'] ?? json['bio']) as String?,
       country: json['country'] as String?,
-      studentCount: json['student_count'] as int? ?? 0,
+      studentCount: (json['student_count'] as num?)?.toInt() ?? 0,
+      maxStudents: (json['max_students'] as num?)?.toInt() ?? 100,
+      isAcceptingRequests: json['is_accepting_requests'] as bool? ?? true,
+      isVerified: json['is_verified'] as bool? ?? true,
+      ratingAvg: ((json['avg_rating'] ?? json['rating_avg']) as num?)?.toDouble() ?? 0.0,
+      ratingCount: (json['rating_count'] as num?)?.toInt() ?? 0,
       specialty: json['specialty'] as String? ??
           'Data Structures & Competitive Programming',
       institutionName: json['institution_name'] as String?,
@@ -61,7 +71,11 @@ class MyTeacherModel extends MyTeacherEntity {
 
   factory MyTeacherModel.fromJson(Map<String, dynamic> json) {
     final hasTeacher = json['has_teacher'] as bool? ?? false;
-    final teacherJson = json['teacher'] as Map<String, dynamic>?;
+    TeacherModel? teacher;
+
+    if (hasTeacher && json['teacher'] != null) {
+      teacher = TeacherModel.fromJson(json['teacher'] as Map<String, dynamic>);
+    }
 
     DateTime? parsedSelectedAt;
     if (json['selected_at'] != null) {
@@ -72,7 +86,7 @@ class MyTeacherModel extends MyTeacherEntity {
 
     return MyTeacherModel(
       hasTeacher: hasTeacher,
-      teacher: teacherJson != null ? TeacherModel.fromJson(teacherJson) : null,
+      teacher: teacher,
       selectedAt: parsedSelectedAt,
     );
   }

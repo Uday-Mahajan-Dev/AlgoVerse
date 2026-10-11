@@ -358,6 +358,8 @@ class _DashboardHeaderState extends State<DashboardHeader> {
             children: [
               Text(
                 'Welcome back, ${widget.user.displayName}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.bold,
@@ -366,6 +368,8 @@ class _DashboardHeaderState extends State<DashboardHeader> {
               const SizedBox(height: 6),
               const Text(
                 'Continue building your problem-solving skills.',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(fontSize: 14, color: Colors.grey),
               ),
             ],
@@ -481,12 +485,16 @@ class LevelXpCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 24),
-          Text(
-            '${levelXp.currentLevel}',
-            style: const TextStyle(
-              fontSize: 56,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              '${levelXp.currentLevel}',
+              style: const TextStyle(
+                fontSize: 56,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
           ),
           const Text(
@@ -511,16 +519,29 @@ class LevelXpCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                '${levelXp.currentXp} / ${levelXp.nextLevelXp} XP',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '${levelXp.currentXp} / ${levelXp.nextLevelXp} XP',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
               ),
-              Text(
-                '${levelXp.xpToNextLevel} XP TO NEXT LEVEL',
-                style: const TextStyle(color: Colors.white70, fontSize: 12),
+              const SizedBox(width: 8),
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    '${levelXp.xpToNextLevel} XP TO NEXT LEVEL',
+                    style: const TextStyle(color: Colors.white70, fontSize: 12),
+                  ),
+                ),
               ),
             ],
           ),
@@ -653,6 +674,8 @@ class ContinueLearningCard extends StatelessWidget {
                 // Lesson Title
                 Text(
                   item.lessonTitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
@@ -663,6 +686,8 @@ class ContinueLearningCard extends StatelessWidget {
                 // Module Title
                 Text(
                   'Module: ${item.moduleTitle}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 13,
                     color: Colors.grey.shade600,
@@ -927,13 +952,19 @@ class StatCard extends StatelessWidget {
           children: [
             Icon(icon, color: iconColor, size: 26),
             const SizedBox(height: 14),
-            Text(
-              value,
-              style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                value,
+                style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+              ),
             ),
             const SizedBox(height: 4),
             Text(
               label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 10,
                 color: Colors.grey.shade600,
@@ -1025,6 +1056,8 @@ class EnrolledCoursesSection extends StatelessWidget {
                           Expanded(
                             child: Text(
                               course.courseTitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
@@ -1428,7 +1461,7 @@ class MentorSection extends ConsumerStatefulWidget {
 
 class _MentorSectionState extends ConsumerState<MentorSection> {
   final _codeController = TextEditingController();
-  bool _isJoining = false;
+  bool _isRequesting = false;
 
   @override
   void dispose() {
@@ -1436,32 +1469,36 @@ class _MentorSectionState extends ConsumerState<MentorSection> {
     super.dispose();
   }
 
-  Future<void> _joinByCode() async {
+  Future<void> _requestByCode() async {
     final code = _codeController.text.trim().toUpperCase();
     if (code.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a 6-character class code')),
+        const SnackBar(content: Text('Please enter an educator class code')),
       );
       return;
     }
 
-    setState(() => _isJoining = true);
+    setState(() => _isRequesting = true);
     try {
       final token = await TokenStorage.getAccessToken();
       if (token == null) throw Exception('Please log in first.');
 
-      final res =
-          await ApiClient.joinClass(accessToken: token, classCode: code);
+      final res = await ApiClient.sendMentorshipRequest(
+        accessToken: token,
+        classCode: code,
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: const Color(0xFF10B981),
-            content:
-                Text(res['message']?.toString() ?? 'Joined class successfully!'),
+            content: Text(res['message']?.toString() ??
+                'Mentorship request sent! Awaiting educator approval.'),
           ),
         );
         _codeController.clear();
         ref.invalidate(myTeacherProvider);
+        ref.invalidate(myMentorsListProvider);
+        ref.invalidate(studentMentorshipRequestsProvider);
         ref.invalidate(studentAssignmentsProvider);
       }
     } catch (e) {
@@ -1474,19 +1511,111 @@ class _MentorSectionState extends ConsumerState<MentorSection> {
         );
       }
     } finally {
-      if (mounted) setState(() => _isJoining = false);
+      if (mounted) setState(() => _isRequesting = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return widget.myTeacherAsync.when(
-      loading: () => const SizedBox.shrink(),
-      error: (error, stackTrace) => const SizedBox.shrink(),
-      data: (myTeacher) {
-        if (myTeacher.hasTeacher && myTeacher.teacher != null) {
-          final teacher = myTeacher.teacher!;
-          return Card(
+    final myMentorsAsync = ref.watch(myMentorsListProvider);
+    final pendingRequestsAsync = ref.watch(studentMentorshipRequestsProvider);
+
+    final mentors = myMentorsAsync.asData?.value ?? [];
+    final pendingRequests = (pendingRequestsAsync.asData?.value ?? [])
+        .where((r) => r.status.toUpperCase() == 'PENDING')
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 1. Pending Mentorship Requests (if any)
+        if (pendingRequests.isNotEmpty) ...[
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.amber.shade50,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.amber.shade300),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.hourglass_top,
+                        size: 20, color: Colors.amber.shade900),
+                    const SizedBox(width: 8),
+                    Text(
+                      'PENDING MENTORSHIP REQUESTS (${pendingRequests.length})',
+                      style: TextStyle(
+                        fontSize: 12,
+                        letterSpacing: 1.0,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.amber.shade900,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                ...pendingRequests.map(
+                  (req) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 14,
+                          backgroundColor: Colors.amber.shade200,
+                          child: Text(
+                            req.teacherName.isNotEmpty
+                                ? req.teacherName[0].toUpperCase()
+                                : 'P',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.amber.shade900,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            '${req.teacherName} • ${req.teacherInstitution ?? 'Educator'}',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.shade200,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            'Awaiting Decision',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.amber.shade900,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+
+        // 2. Approved Mentors List (Multi-Professor)
+        if (mentors.isNotEmpty) ...[
+          Card(
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
@@ -1501,89 +1630,104 @@ class _MentorSectionState extends ConsumerState<MentorSection> {
                     children: [
                       const Icon(Icons.school_outlined, color: Colors.indigo),
                       const SizedBox(width: 8),
-                      const Text(
-                        'MY MENTOR TEACHER',
-                        style: TextStyle(
+                      Text(
+                        'MY MENTORS (${mentors.length})',
+                        style: const TextStyle(
                           fontSize: 12,
                           letterSpacing: 1.1,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       const Spacer(),
-                      TextButton(
+                      TextButton.icon(
                         onPressed: () {
                           context.push(AppRoutes.teachers);
                         },
-                        child: const Text('Change Mentor'),
+                        icon: const Icon(Icons.person_add_alt, size: 16),
+                        label: const Text('Add Mentor'),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 26,
-                        backgroundColor: Colors.indigo.withValues(alpha: 0.1),
-                        backgroundImage: teacher.avatarUrl != null
-                            ? NetworkImage(teacher.avatarUrl!)
-                            : null,
-                        child: teacher.avatarUrl == null
-                            ? Text(
-                                teacher.displayName.isNotEmpty
-                                    ? teacher.displayName[0].toUpperCase()
-                                    : 'T',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.indigo,
-                                  fontSize: 20,
+                  const SizedBox(height: 12),
+                  ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: mentors.length,
+                    separatorBuilder: (_, _) =>
+                        Divider(height: 20, color: Colors.grey.shade200),
+                    itemBuilder: (context, idx) {
+                      final mentor = mentors[idx];
+                      return Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 24,
+                            backgroundColor:
+                                Colors.indigo.withValues(alpha: 0.1),
+                            backgroundImage: mentor.teacherAvatar != null
+                                ? NetworkImage(mentor.teacherAvatar!)
+                                : null,
+                            child: mentor.teacherAvatar == null
+                                ? Text(
+                                    mentor.teacherName.isNotEmpty
+                                        ? mentor.teacherName[0].toUpperCase()
+                                        : 'P',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.indigo,
+                                      fontSize: 18,
+                                    ),
+                                  )
+                                : null,
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  mentor.teacherName,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
-                              )
-                            : null,
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              teacher.displayName,
-                              style: const TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.bold,
-                              ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  mentor.institutionName != null
+                                      ? '${mentor.designation ?? 'Professor'} • ${mentor.institutionName}'
+                                      : (mentor.specialty ?? 'Educator'),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              teacher.specialty,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Colors.grey.shade600,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                          ),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.arrow_forward_ios_rounded,
+                              size: 15,
                             ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.arrow_forward_ios_rounded,
-                          size: 16,
-                        ),
-                        onPressed: () {
-                          context.push('/teachers/${teacher.id}');
-                        },
-                      ),
-                    ],
+                            onPressed: () {
+                              context.push('/teachers/${mentor.teacherId}');
+                            },
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ],
               ),
             ),
-          );
-        }
+          ),
+          const SizedBox(height: 16),
+        ],
 
-        // Student has no mentor teacher yet -> Show Class Code Join & Catalog CTA
-        return Container(
+        // 3. Class Code Request Intake Card
+        Container(
           width: double.infinity,
           padding: const EdgeInsets.all(22),
           decoration: BoxDecoration(
@@ -1617,7 +1761,7 @@ class _MentorSectionState extends ConsumerState<MentorSection> {
                   const SizedBox(width: 12),
                   const Expanded(
                     child: Text(
-                      'Join a Class via Code',
+                      'Request Class Access via Code',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 18,
@@ -1629,7 +1773,7 @@ class _MentorSectionState extends ConsumerState<MentorSection> {
               ),
               const SizedBox(height: 10),
               const Text(
-                'Enter the 6-character class code provided by your educator to link your learning analytics and receive assignments.',
+                'Enter the class code from your educator to submit a mentorship request. Once approved, you will join their classroom roster.',
                 style: TextStyle(
                   color: Colors.white70,
                   fontSize: 13,
@@ -1637,7 +1781,6 @@ class _MentorSectionState extends ConsumerState<MentorSection> {
                 ),
               ),
               const SizedBox(height: 16),
-              // Class Code Input Row
               Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
@@ -1652,7 +1795,7 @@ class _MentorSectionState extends ConsumerState<MentorSection> {
                         controller: _codeController,
                         textCapitalization: TextCapitalization.characters,
                         decoration: const InputDecoration(
-                          hintText: 'e.g. VIT-892',
+                          hintText: 'e.g. MIT-492',
                           border: InputBorder.none,
                           isDense: true,
                           contentPadding: EdgeInsets.symmetric(vertical: 12),
@@ -1666,7 +1809,7 @@ class _MentorSectionState extends ConsumerState<MentorSection> {
                     ),
                     const SizedBox(width: 8),
                     FilledButton(
-                      onPressed: _isJoining ? null : _joinByCode,
+                      onPressed: _isRequesting ? null : _requestByCode,
                       style: FilledButton.styleFrom(
                         backgroundColor: Colors.indigo.shade800,
                         padding: const EdgeInsets.symmetric(
@@ -1675,7 +1818,7 @@ class _MentorSectionState extends ConsumerState<MentorSection> {
                           borderRadius: BorderRadius.circular(10),
                         ),
                       ),
-                      child: _isJoining
+                      child: _isRequesting
                           ? const SizedBox(
                               width: 18,
                               height: 18,
@@ -1685,7 +1828,7 @@ class _MentorSectionState extends ConsumerState<MentorSection> {
                               ),
                             )
                           : const Text(
-                              'Join Class',
+                              'Send Request',
                               style: TextStyle(fontWeight: FontWeight.bold),
                             ),
                     ),
@@ -1702,15 +1845,15 @@ class _MentorSectionState extends ConsumerState<MentorSection> {
                   icon: const Icon(Icons.person_search_outlined,
                       size: 18, color: Colors.white70),
                   label: const Text(
-                    'Or Browse Educator Catalog',
+                    'Or Browse Faculty Directory',
                     style: TextStyle(color: Colors.white70, fontSize: 13),
                   ),
                 ),
               ),
             ],
           ),
-        );
-      },
+        ),
+      ],
     );
   }
 }

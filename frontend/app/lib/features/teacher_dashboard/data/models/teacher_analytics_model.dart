@@ -28,6 +28,9 @@ class TeacherOverviewModel extends TeacherOverviewEntity {
     required super.activeStudents,
     required super.avgCourseCompletion,
     required super.totalSubmissionsToday,
+    super.maxStudents = 100,
+    super.isAcceptingRequests = true,
+    super.isVerified = false,
     required super.recentActivityFeed,
   });
 
@@ -42,6 +45,9 @@ class TeacherOverviewModel extends TeacherOverviewEntity {
       activeStudents: json['active_students'] as int? ?? 0,
       avgCourseCompletion: (json['avg_course_completion'] as num?)?.toDouble() ?? 0.0,
       totalSubmissionsToday: json['total_submissions_today'] as int? ?? 0,
+      maxStudents: json['max_students'] as int? ?? 100,
+      isAcceptingRequests: json['is_accepting_requests'] as bool? ?? true,
+      isVerified: json['is_verified'] as bool? ?? false,
       recentActivityFeed: feed,
     );
   }

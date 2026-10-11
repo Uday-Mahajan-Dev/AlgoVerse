@@ -16,6 +16,9 @@ class TeacherOverviewResponse(BaseModel):
     active_students: int
     avg_course_completion: float
     total_submissions_today: int
+    max_students: int = 100
+    is_accepting_requests: bool = True
+    is_verified: bool = False
     recent_activity_feed: list[RecentActivityItem] = Field(default_factory=list)
 
 

@@ -6,6 +6,7 @@ class PublicTestCaseModel extends PublicTestCase {
     required super.stdinInput,
     required super.expectedStdout,
     required super.orderIndex,
+    super.explanation,
   });
 
   factory PublicTestCaseModel.fromJson(Map<String, dynamic> json) {
@@ -14,6 +15,7 @@ class PublicTestCaseModel extends PublicTestCase {
       stdinInput: json['stdin_input'] as String? ?? '',
       expectedStdout: json['expected_stdout'] as String? ?? '',
       orderIndex: json['order_index'] as int? ?? 0,
+      explanation: json['explanation'] as String?,
     );
   }
 }

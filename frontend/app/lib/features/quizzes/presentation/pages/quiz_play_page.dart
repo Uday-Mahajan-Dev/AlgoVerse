@@ -25,6 +25,11 @@ class _QuizPlayPageState extends State<QuizPlayPage>
   int _secondsRemaining = 30;
   Timer? _timer;
 
+  // Quiz-level timer (Phase 5)
+  int? _timeLimitSeconds;
+  int _totalSecondsRemaining = 0;
+  Timer? _quizTimer;
+
   // Question State
   int? _selectedOptionIndex;
   bool _isAnswerLocked = false;
@@ -44,7 +49,14 @@ class _QuizPlayPageState extends State<QuizPlayPage>
   @override
   void dispose() {
     _timer?.cancel();
+    _quizTimer?.cancel();
     super.dispose();
+  }
+
+  String _formatTime(int sec) {
+    final m = sec ~/ 60;
+    final s = sec % 60;
+    return '$m:${s.toString().padLeft(2, '0')}';
   }
 
   Future<void> _loadQuiz() async {
@@ -65,10 +77,17 @@ class _QuizPlayPageState extends State<QuizPlayPage>
           _questions = (res['questions'] as List<dynamic>?) ?? [];
           _timePerQuestion = res['time_per_question_seconds'] ?? 30;
           _secondsRemaining = _timePerQuestion;
+          _timeLimitSeconds = res['time_limit_seconds'] as int?;
+          if (_timeLimitSeconds != null && _timeLimitSeconds! > 0) {
+            _totalSecondsRemaining = _timeLimitSeconds!;
+          }
           _isLoading = false;
         });
         if (_questions.isNotEmpty) {
           _startQuestionTimer();
+          if (_timeLimitSeconds != null && _timeLimitSeconds! > 0) {
+            _startQuizTimer();
+          }
         }
       }
     } catch (e) {
@@ -79,6 +98,32 @@ class _QuizPlayPageState extends State<QuizPlayPage>
         });
       }
     }
+  }
+
+  void _startQuizTimer() {
+    _quizTimer?.cancel();
+    _quizTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (_totalSecondsRemaining > 1) {
+        if (mounted) setState(() => _totalSecondsRemaining--);
+      } else {
+        _quizTimer?.cancel();
+        _onQuizTimeExpired();
+      }
+    });
+  }
+
+  void _onQuizTimeExpired() {
+    if (_isFinished) return;
+    _timer?.cancel();
+    while (_answersSubmitted.length < _questions.length) {
+      final q = _questions[_answersSubmitted.length];
+      _answersSubmitted.add({
+        'question_id': q['id']?.toString() ?? '',
+        'selected_index': -1,
+        'time_taken_seconds': _timePerQuestion,
+      });
+    }
+    _submitAllAnswers();
   }
 
   void _startQuestionTimer() {
@@ -274,6 +319,40 @@ class _QuizPlayPageState extends State<QuizPlayPage>
                     ),
                   ),
                   const Spacer(),
+                  if (_timeLimitSeconds != null) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: _totalSecondsRemaining < 30
+                            ? Colors.red.withValues(alpha: 0.25)
+                            : Colors.indigo.withValues(alpha: 0.25),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _totalSecondsRemaining < 30 ? Colors.redAccent : Colors.indigoAccent,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.hourglass_bottom_rounded,
+                            size: 15,
+                            color: _totalSecondsRemaining < 30 ? Colors.redAccent : Colors.cyanAccent,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Quiz: ${_formatTime(_totalSecondsRemaining)}',
+                            style: TextStyle(
+                              color: _totalSecondsRemaining < 30 ? Colors.redAccent : Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
                   // Timer Indicator
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
@@ -475,6 +554,9 @@ class _QuizPlayPageState extends State<QuizPlayPage>
     }
 
     final score = _resultData?['score'] ?? 0;
+    final rawScore = _resultData?['raw_score'] ?? score;
+    final finalScore = _resultData?['final_score'] ?? score;
+    final multiplier = (_resultData?['multiplier_applied'] as num?)?.toDouble() ?? 1.0;
     final maxScore = _resultData?['max_possible_score'] ?? 1000;
     final correctCount = _resultData?['correct_count'] ?? 0;
     final totalQ = _resultData?['total_questions'] ?? _questions.length;
@@ -536,7 +618,7 @@ class _QuizPlayPageState extends State<QuizPlayPage>
                     child: Column(
                       children: [
                         Text(
-                          '$score',
+                          '$finalScore',
                           style: const TextStyle(
                             fontSize: 48,
                             fontWeight: FontWeight.w900,
@@ -544,12 +626,29 @@ class _QuizPlayPageState extends State<QuizPlayPage>
                           ),
                         ),
                         Text(
-                          'POINTS EARNED (Max: $maxScore)',
+                          'FINAL SCORE (Max: $maxScore)',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
                             letterSpacing: 1.2,
                             color: Colors.grey.shade400,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+                          ),
+                          child: Text(
+                            'Raw: $rawScore → Multiplier: ${multiplier.toStringAsFixed(2)}× → Final: $finalScore',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.amber,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 20),

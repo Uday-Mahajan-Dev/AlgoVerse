@@ -23,6 +23,9 @@ class TeacherOverviewEntity {
   final int activeStudents;
   final double avgCourseCompletion;
   final int totalSubmissionsToday;
+  final int maxStudents;
+  final bool isAcceptingRequests;
+  final bool isVerified;
   final List<RecentActivityItemEntity> recentActivityFeed;
 
   const TeacherOverviewEntity({
@@ -30,6 +33,9 @@ class TeacherOverviewEntity {
     required this.activeStudents,
     required this.avgCourseCompletion,
     required this.totalSubmissionsToday,
+    this.maxStudents = 100,
+    this.isAcceptingRequests = true,
+    this.isVerified = false,
     required this.recentActivityFeed,
   });
 }

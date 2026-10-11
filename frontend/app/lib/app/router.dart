@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/constants/app_routes.dart';
+import '../features/admin/presentation/pages/admin_educators_page.dart';
 import '../features/auth/presentation/pages/login_page.dart';
 import '../features/auth/presentation/pages/register_page.dart';
 import '../features/auth/presentation/pages/verify_email_page.dart';
@@ -118,7 +119,7 @@ List<RouteBase> _buildRoutes() {
 
     GoRoute(
       path: AppRoutes.admin,
-      builder: (context, state) => const StudentDashboardPage(),
+      builder: (context, state) => const AdminEducatorsPage(),
     ),
 
     GoRoute(

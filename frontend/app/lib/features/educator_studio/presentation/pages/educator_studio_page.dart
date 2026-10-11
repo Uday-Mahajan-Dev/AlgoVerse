@@ -640,8 +640,14 @@ class _CreateProblemDialogState extends State<_CreateProblemDialog> {
   bool _isSubmitting = false;
 
   final List<Map<String, dynamic>> _testCases = [
-    {'input': '1 2', 'expected': '3', 'is_hidden': false},
+    {'input': '1 2', 'expected': '3', 'is_hidden': true, 'explanation': ''},
   ];
+
+  bool get _hasMissingExplanation {
+    return _testCases.any((tc) =>
+        tc['is_hidden'] != true &&
+        (tc['explanation']?.toString().trim().isEmpty ?? true));
+  }
 
   @override
   void dispose() {
@@ -748,7 +754,7 @@ class _CreateProblemDialogState extends State<_CreateProblemDialog> {
 
   void _addTestCase() {
     setState(() {
-      _testCases.add({'input': '', 'expected': '', 'is_hidden': false});
+      _testCases.add({'input': '', 'expected': '', 'is_hidden': true, 'explanation': ''});
     });
   }
 
@@ -769,6 +775,17 @@ class _CreateProblemDialogState extends State<_CreateProblemDialog> {
           _testCases[i]['expected'].toString().trim().isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Test case ${i + 1} is missing input or expected output.')),
+        );
+        return;
+      }
+      final isHidden = _testCases[i]['is_hidden'] == true;
+      final explanation = _testCases[i]['explanation']?.toString().trim() ?? '';
+      if (!isHidden && explanation.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Test case ${i + 1} is visible to students and requires a short explanation (max 200 chars).'),
+            backgroundColor: Colors.red.shade700,
+          ),
         );
         return;
       }
@@ -1299,6 +1316,28 @@ class _CreateProblemDialogState extends State<_CreateProblemDialog> {
                                   }
                                 },
                               ),
+                              if (tc['is_hidden'] != true) ...[
+                                const SizedBox(height: 8),
+                                TextFormField(
+                                  initialValue: tc['explanation']?.toString(),
+                                  maxLength: 200,
+                                  decoration: InputDecoration(
+                                    labelText: 'Explanation (Required for visible test)',
+                                    hintText: 'Explain how expected output is derived (max 200 chars)...',
+                                    isDense: true,
+                                    border: const OutlineInputBorder(),
+                                    prefixIcon: const Icon(Icons.lightbulb_outline_rounded, size: 18),
+                                    errorText: (tc['explanation']?.toString().trim().isEmpty ?? true)
+                                        ? 'Explanation required when visible to students'
+                                        : null,
+                                  ),
+                                  onChanged: (val) {
+                                    setState(() {
+                                      tc['explanation'] = val;
+                                    });
+                                  },
+                                ),
+                              ],
                             ],
                           ),
                         );
@@ -1316,7 +1355,7 @@ class _CreateProblemDialogState extends State<_CreateProblemDialog> {
                     ),
                     const SizedBox(width: 12),
                     FilledButton(
-                      onPressed: _isSubmitting ? null : _submit,
+                      onPressed: (_isSubmitting || _hasMissingExplanation) ? null : _submit,
                       style: FilledButton.styleFrom(backgroundColor: Colors.purple.shade700),
                       child: _isSubmitting
                           ? const SizedBox(
@@ -1354,8 +1393,13 @@ class _CreateQuizDialogState extends State<_CreateQuizDialog> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descController = TextEditingController();
+  final _timeLimitController = TextEditingController();
+  final _minMultiplierController = TextEditingController(text: '0.5');
+  final _decayController = TextEditingController(text: '0.5');
   String _visibility = 'CLASS_ONLY';
+  String _scoringMode = 'FLAT';
   int _timePerQuestion = 30;
+  bool _showAdvancedScoring = false;
   bool _isSubmitting = false;
 
   final List<Map<String, dynamic>> _questions = [
@@ -1370,6 +1414,9 @@ class _CreateQuizDialogState extends State<_CreateQuizDialog> {
   void dispose() {
     _titleController.dispose();
     _descController.dispose();
+    _timeLimitController.dispose();
+    _minMultiplierController.dispose();
+    _decayController.dispose();
     super.dispose();
   }
 
@@ -1413,6 +1460,12 @@ class _CreateQuizDialogState extends State<_CreateQuizDialog> {
       }
     }
 
+    final int? timeLimit = _timeLimitController.text.trim().isNotEmpty
+        ? int.tryParse(_timeLimitController.text.trim())
+        : null;
+    final double minMultiplier = double.tryParse(_minMultiplierController.text.trim()) ?? 0.5;
+    final double decay = double.tryParse(_decayController.text.trim()) ?? 0.5;
+
     setState(() => _isSubmitting = true);
 
     try {
@@ -1421,6 +1474,10 @@ class _CreateQuizDialogState extends State<_CreateQuizDialog> {
         description: _descController.text.trim(),
         visibility: _visibility,
         timePerQuestion: _timePerQuestion,
+        scoringMode: _scoringMode,
+        timeLimitSeconds: timeLimit,
+        minMultiplier: minMultiplier,
+        decay: decay,
         questions: _questions,
       );
 
@@ -1579,6 +1636,121 @@ class _CreateQuizDialogState extends State<_CreateQuizDialog> {
                           }
                         },
                       ),
+                      const SizedBox(height: 16),
+                      // Phase 5: Scoring Mode & Time Scoring Settings
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFCBD5E1)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.speed_rounded, size: 20, color: Color(0xFF6366F1)),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Scoring & Timer Settings',
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            DropdownButtonFormField<String>(
+                              initialValue: _scoringMode,
+                              decoration: const InputDecoration(
+                                labelText: 'Scoring Mode',
+                                border: OutlineInputBorder(),
+                                filled: true,
+                                fillColor: Colors.white,
+                              ),
+                              items: const [
+                                DropdownMenuItem(
+                                  value: 'FLAT',
+                                  child: Text('Flat Score (100 pts per correct answer)'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'TIME_MULTIPLIER',
+                                  child: Text('Time-Based Multiplier (Faster submit = higher score)'),
+                                ),
+                              ],
+                              onChanged: (v) {
+                                if (v != null) setState(() => _scoringMode = v);
+                              },
+                            ),
+                            const SizedBox(height: 12),
+                            TextFormField(
+                              controller: _timeLimitController,
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(
+                                labelText: 'Quiz Time Limit (Seconds, Optional)',
+                                hintText: 'e.g. 180 for 3 minutes total countdown',
+                                border: OutlineInputBorder(),
+                                filled: true,
+                                fillColor: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            InkWell(
+                              onTap: () => setState(() => _showAdvancedScoring = !_showAdvancedScoring),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 4),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      _showAdvancedScoring ? Icons.expand_less : Icons.expand_more,
+                                      size: 18,
+                                      color: const Color(0xFF475569),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      _showAdvancedScoring ? 'Hide Advanced Multiplier Settings' : 'Advanced Multiplier Decay Settings',
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            if (_showAdvancedScoring) ...[
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: TextFormField(
+                                      controller: _minMultiplierController,
+                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                      decoration: const InputDecoration(
+                                        labelText: 'Min Multiplier',
+                                        hintText: 'Default 0.5',
+                                        border: OutlineInputBorder(),
+                                        filled: true,
+                                        fillColor: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: TextFormField(
+                                      controller: _decayController,
+                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                      decoration: const InputDecoration(
+                                        labelText: 'Decay Factor',
+                                        hintText: 'Default 0.5',
+                                        border: OutlineInputBorder(),
+                                        filled: true,
+                                        fillColor: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
                       const SizedBox(height: 20),
                       Row(
                         children: [
@@ -1680,8 +1852,10 @@ class _CreateQuizDialogState extends State<_CreateQuizDialog> {
                                           children: [
                                             Radio<int>(
                                               value: optIdx,
+                                              // ignore: deprecated_member_use
                                               groupValue: correctIdx,
                                               activeColor: col,
+                                              // ignore: deprecated_member_use
                                               onChanged: (val) {
                                                 if (val != null) {
                                                   setState(() => q['correct_option_index'] = val);
