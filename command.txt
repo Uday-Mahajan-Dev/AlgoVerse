@@ -1,0 +1,1 @@
+analyze this whole project and generate a full working and technical report with everything included the data flow as well as system architecture all services and how they are connected do not miss anything also with report generate a handoff prompt for this

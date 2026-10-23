@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_routes.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/widgets/social_login_button.dart';
 import '../../data/social_auth_service.dart';
@@ -22,6 +23,12 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
   bool _isLoading = false;
   bool _obscurePassword = true;
+
+  @override
+  void initState() {
+    super.initState();
+    ApiClient.warmBackend();
+  }
 
   @override
   void dispose() {
@@ -153,7 +160,19 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
 
   String _cleanError(Object error) {
-    return error.toString().replaceFirst('Exception: ', '');
+    final str = error.toString().replaceFirst('Exception: ', '');
+    final lower = str.toLowerCase();
+    if (lower.contains('timeoutexception') ||
+        lower.contains('timed out') ||
+        lower.contains('future not completed') ||
+        lower.contains('connection refused') ||
+        lower.contains('failed host lookup') ||
+        lower.contains('spinning up') ||
+        lower.contains('waking up') ||
+        lower.contains('cold start')) {
+      return 'Server is waking up (cold start). Please wait a few seconds and try again.';
+    }
+    return str;
   }
 
   void _showMessage(String message) {

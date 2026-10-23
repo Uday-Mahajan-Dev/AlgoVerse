@@ -304,16 +304,15 @@ class _LessonViewPageState extends ConsumerState<LessonViewPage> {
                         ] else ...[
                           // Render content_json based on contentType
                           _LessonContentRenderer(
-                            lessonId: targetLesson.id,
-                            contentType: targetLesson.contentType,
-                            contentJson: targetLesson.contentJson,
-                            lessonSlug: targetLesson.slug,
+                            lessonId: currentLesson.id,
+                            contentType: currentLesson.contentType,
+                            contentJson: currentLesson.contentJson,
+                            lessonSlug: currentLesson.slug,
+                            isLessonCompleted: currentLesson.isCompleted,
                             onLessonCompleted: () {
-                              ref.invalidate(courseDetailProvider(widget.courseSlug));
-                              ref.invalidate(courseProgressProvider(widget.courseSlug));
-                              ref.invalidate(coursesListProvider);
-                              ref.invalidate(allStudentProgressProvider);
-                              ref.invalidate(studentDashboardProvider);
+                              if (!currentLesson.isCompleted) {
+                                _completeLesson(currentLesson.id, currentLesson.title);
+                              }
                             },
                           ),
                         ],
@@ -588,6 +587,7 @@ class _LessonContentRenderer extends StatelessWidget {
   final Map<String, dynamic> contentJson;
   final String lessonSlug;
   final VoidCallback? onLessonCompleted;
+  final bool? isLessonCompleted;
 
   const _LessonContentRenderer({
     this.lessonId,
@@ -595,6 +595,7 @@ class _LessonContentRenderer extends StatelessWidget {
     required this.contentJson,
     required this.lessonSlug,
     this.onLessonCompleted,
+    this.isLessonCompleted,
   });
 
   @override
@@ -604,6 +605,8 @@ class _LessonContentRenderer extends StatelessWidget {
         return InteractiveVisualizerWorkspace(
           lessonId: lessonId,
           contentJson: contentJson,
+          onLessonCompleted: onLessonCompleted,
+          isLessonCompleted: isLessonCompleted,
         );
       case 'PROBLEM':
         return ProblemWorkspaceWidget(

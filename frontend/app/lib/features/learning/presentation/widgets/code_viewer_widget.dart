@@ -142,12 +142,22 @@ class CodeViewerWidget extends StatelessWidget {
 
                 return AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
-                  color: isActive
-                      ? const Color(0xFF45475A).withValues(alpha: 0.6)
-                      : Colors.transparent,
+                  decoration: BoxDecoration(
+                    color: isActive
+                        ? const Color(0xFF363A4F)
+                        : Colors.transparent,
+                    border: Border(
+                      left: BorderSide(
+                        color: isActive
+                            ? const Color(0xFFF9E2AF)
+                            : Colors.transparent,
+                        width: 3.5,
+                      ),
+                    ),
+                  ),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
-                    vertical: 3,
+                    vertical: 4,
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,

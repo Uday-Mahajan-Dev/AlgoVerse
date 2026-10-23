@@ -513,8 +513,8 @@ class QuizService:
             .order_by(desc(QuizAttempt.final_score), QuizAttempt.time_taken_seconds.asc())
         )
 
-        # If CLASS_ONLY and requester is not the teacher, filter to teacher's class students
-        if quiz.visibility == "CLASS_ONLY":
+        # If CLASS_ONLY and requester is not the teacher author, filter to teacher's class students
+        if quiz.visibility == "CLASS_ONLY" and current_user.id != quiz.teacher_id:
             attempts = db.scalars(attempts_query).all()
             # Fetch all classroom student ids for this teacher
             class_student_ids = set(
@@ -524,11 +524,11 @@ class QuizService:
             )
             filtered = []
             for att in attempts:
-                if att.student_id in class_student_ids or att.student_id == current_user.id or quiz.teacher_id == current_user.id:
+                if att.student_id in class_student_ids or att.student_id == current_user.id:
                     filtered.append(att)
             attempts = filtered
         else:
-            attempts = db.scalars(attempts_query.limit(50)).all()
+            attempts = db.scalars(attempts_query).all()
 
         # Deduplicate best score per student
         seen_students = set()
@@ -588,7 +588,10 @@ class QuizService:
             select(QuizAttempt)
             .where(QuizAttempt.quiz_id == quiz_id)
             .options(selectinload(QuizAttempt.student))
-            .order_by(desc(QuizAttempt.score), QuizAttempt.total_time_seconds.asc())
+            .order_by(
+                desc(func.coalesce(QuizAttempt.final_score, QuizAttempt.score)),
+                func.coalesce(QuizAttempt.time_taken_seconds, QuizAttempt.total_time_seconds).asc(),
+            )
         ).all()
 
         # Fetch classroom student ids for this teacher
@@ -599,10 +602,15 @@ class QuizService:
         )
 
         total_attempts = len(attempts)
-        avg_score = (sum(a.score for a in attempts) / total_attempts) if total_attempts > 0 else 0.0
-        highest_score = max((a.score for a in attempts), default=0)
+        avg_score = (
+            sum((a.final_score if a.final_score is not None else a.score) for a in attempts) / total_attempts
+        ) if total_attempts > 0 else 0.0
+        highest_score = max(
+            ((a.final_score if a.final_score is not None else a.score) for a in attempts),
+            default=0,
+        )
 
-        # Class attempts vs non-class
+        # Build complete attempt list and leaderboard without excluding non-roster students for author
         class_attempts_list = []
         top_scorers_list = []
         seen_students = set()
@@ -611,32 +619,40 @@ class QuizService:
         for a in attempts:
             student = a.student
             is_class_student = a.student_id in class_student_ids
-            
-            student_name = (f"{student.first_name or ''} {student.last_name or ''}".strip() or student.username) if (student and is_class_student) else "Anonymous Student"
-            
-            if is_class_student:
-                class_attempts_list.append(
-                    QuizAttemptDetail(
-                        student_id=a.student_id,
-                        student_name=student_name,
-                        is_class_student=True,
-                        score=a.score,
-                        total_time_seconds=a.total_time_seconds,
-                        submitted_at=a.submitted_at,
-                        answers=a.answers or [],
-                    )
-                )
+            student_name = (
+                f"{student.first_name or ''} {student.last_name or ''}".strip() or student.username
+            ) if student else "Student"
+            avatar_url = student.avatar_url if student else None
 
-            if a.student_id not in seen_students and len(top_scorers_list) < 10:
+            effective_score = a.final_score if a.final_score is not None else a.score
+            effective_time = a.time_taken_seconds if a.time_taken_seconds is not None else a.total_time_seconds
+
+            class_attempts_list.append(
+                QuizAttemptDetail(
+                    student_id=a.student_id,
+                    student_name=student_name,
+                    is_class_student=is_class_student,
+                    score=effective_score,
+                    total_time_seconds=effective_time,
+                    submitted_at=a.submitted_at,
+                    answers=a.answers or [],
+                )
+            )
+
+            if a.student_id not in seen_students:
                 seen_students.add(a.student_id)
                 top_scorers_list.append(
                     QuizLeaderboardEntry(
                         rank=rank,
                         student_id=a.student_id,
                         student_name=student_name,
-                        avatar_url=student.avatar_url if (student and is_class_student) else None,
-                        score=a.score,
-                        total_time_seconds=a.total_time_seconds,
+                        avatar_url=avatar_url,
+                        score=effective_score,
+                        final_score=effective_score,
+                        raw_score=a.raw_score if a.raw_score is not None else a.score,
+                        multiplier_applied=a.multiplier_applied if a.multiplier_applied is not None else 1.0,
+                        total_time_seconds=effective_time,
+                        time_taken_seconds=effective_time,
                         submitted_at=a.submitted_at,
                     )
                 )

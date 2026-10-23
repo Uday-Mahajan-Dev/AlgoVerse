@@ -1,36 +1,160 @@
+import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show Platform;
+import 'dart:io' show Platform, SocketException;
 
-import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart'
+    show debugPrint, kDebugMode, kIsWeb, kReleaseMode;
 import 'package:http/http.dart' as http;
 
 import '../constants/app_constants.dart';
 import '../storage/token_storage.dart';
 
-String get defaultBaseUrl {
-  const envUrl = String.fromEnvironment('API_URL');
-  if (envUrl.isNotEmpty) return envUrl;
-
-  if (kIsWeb) return 'http://127.0.0.1:8000';
-  if (!kIsWeb && Platform.isAndroid) return 'http://10.0.2.2:8000';
-  return 'http://127.0.0.1:8000';
-}
+String get defaultBaseUrl => ApiClient.baseUrl;
 
 class ApiClient {
   ApiClient._();
 
-  static String get defaultBaseUrl {
-    const envUrl = String.fromEnvironment('API_URL');
-    if (envUrl.isNotEmpty) return envUrl;
+  /// Primary Production Render Backend (Single source of truth)
+  static const String productionBaseUrl =
+      'https://algoverse-api-cthi.onrender.com/api/v1';
 
-    if (kIsWeb) return 'http://127.0.0.1:8000';
-    if (!kIsWeb && Platform.isAndroid) return 'http://10.0.2.2:8000';
-    return 'http://127.0.0.1:8000';
+  static const String defaultBaseUrl = productionBaseUrl;
+
+  /// Resolves the effective base URL.
+  /// Release APKs ALWAYS resolve to [productionBaseUrl].
+  static String resolveBaseUrl() {
+    const fromEnv = String.fromEnvironment('BASE_URL');
+    if (fromEnv.isNotEmpty) {
+      // In release builds: Never permit emulator or localhost addresses
+      if (kReleaseMode &&
+          (fromEnv.contains('10.0.2.2') ||
+              fromEnv.contains('127.0.0.1') ||
+              fromEnv.contains('localhost'))) {
+        return productionBaseUrl;
+      }
+      return fromEnv.endsWith('/api/v1') ? fromEnv : '$fromEnv/api/v1';
+    }
+
+    // Optional debug override only in debug mode
+    if (kDebugMode) {
+      const useLocal =
+          bool.fromEnvironment('USE_LOCAL_BACKEND', defaultValue: false);
+      if (useLocal) {
+        if (kIsWeb) return 'http://127.0.0.1:8000/api/v1';
+        if (Platform.isAndroid) return 'http://10.0.2.2:8000/api/v1';
+        return 'http://127.0.0.1:8000/api/v1';
+      }
+    }
+
+    // RELEASE + fallback must always be Render productionBaseUrl
+    return productionBaseUrl;
   }
 
-  static String get host => defaultBaseUrl;
+  static String get baseUrl => resolveBaseUrl();
 
-  static String get baseUrl => '$defaultBaseUrl/api/v1';
+  static String get host {
+    final b = baseUrl;
+    if (b.endsWith('/api/v1')) {
+      return b.substring(0, b.length - '/api/v1'.length);
+    }
+    return b;
+  }
+
+  /// Fire-and-forget lightweight ping to warm up Render server on app/login init
+  static void warmBackend() {
+    unawaited(() async {
+      try {
+        await http
+            .get(Uri.parse('$host/docs'))
+            .timeout(const Duration(seconds: 10));
+      } catch (_) {
+        // Silently ignored; wake-up ping only
+      }
+    }());
+  }
+
+  /// Configured Dio instance with 60-second timeouts & cold start interceptor
+  static final Dio dio = _initDio();
+
+  static Dio _initDio() {
+    assert(() {
+      debugPrint('[ApiClient] baseUrl = $baseUrl');
+      return true;
+    }());
+
+    final client = Dio(
+      BaseOptions(
+        baseUrl: baseUrl,
+        connectTimeout: const Duration(seconds: 60),
+        receiveTimeout: const Duration(seconds: 60),
+        sendTimeout: const Duration(seconds: 60),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      ),
+    );
+
+    client.interceptors.add(
+      InterceptorsWrapper(
+        onError: (DioException error, ErrorInterceptorHandler handler) {
+          if (error.type == DioExceptionType.connectionTimeout ||
+              error.type == DioExceptionType.receiveTimeout ||
+              error.type == DioExceptionType.sendTimeout ||
+              error.type == DioExceptionType.connectionError ||
+              error.error is TimeoutException) {
+            final friendlyException = DioException(
+              requestOptions: error.requestOptions,
+              error: serverSpinningUpMessage,
+              message: serverSpinningUpMessage,
+              type: error.type,
+              response: error.response,
+            );
+            return handler.reject(friendlyException);
+          }
+          return handler.next(error);
+        },
+      ),
+    );
+
+    return client;
+  }
+
+  static const String serverSpinningUpMessage =
+      'Server is waking up (cold start). Please wait a few seconds and try again.';
+
+  static Future<T> _guard<T>(Future<T> Function() call) async {
+    try {
+      return await call();
+    } on TimeoutException {
+      throw Exception(serverSpinningUpMessage);
+    } on SocketException {
+      throw Exception(serverSpinningUpMessage);
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.connectionError ||
+          e.error is TimeoutException) {
+        throw Exception(serverSpinningUpMessage);
+      }
+      throw Exception(e.message ?? serverSpinningUpMessage);
+    } catch (e) {
+      final msg = e.toString().toLowerCase();
+      if (msg.contains('timeoutexception') ||
+          msg.contains('timed out') ||
+          msg.contains('future not completed') ||
+          msg.contains('connection refused') ||
+          msg.contains('failed host lookup') ||
+          msg.contains('network is unreachable') ||
+          msg.contains('socketexception') ||
+          msg.contains('clientexception')) {
+        throw Exception(serverSpinningUpMessage);
+      }
+      rethrow;
+    }
+  }
 
   /// Global callback triggered on 401 Unauthorized / expired session.
   static void Function()? onUnauthorizedSession;
@@ -112,21 +236,23 @@ class ApiClient {
     required String firstName,
     required String lastName,
   }) async {
-    final response = await http
-        .post(
-          Uri.parse('$baseUrl/auth/register'),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'username': username,
-            'email': email,
-            'password': password,
-            'first_name': firstName,
-            'last_name': lastName,
-          }),
-        )
-        .timeout(AppConstants.requestTimeout);
+    return _guard(() async {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/auth/register'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'username': username,
+              'email': email,
+              'password': password,
+              'first_name': firstName,
+              'last_name': lastName,
+            }),
+          )
+          .timeout(AppConstants.requestTimeout);
 
-    return _handleResponse(response);
+      return _handleResponse(response);
+    });
   }
 
   // ============================================================
@@ -137,15 +263,17 @@ class ApiClient {
     required String email,
     required String otp,
   }) async {
-    final response = await http
-        .post(
-          Uri.parse('$baseUrl/auth/verify-email'),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({'email': email, 'otp': otp}),
-        )
-        .timeout(AppConstants.requestTimeout);
+    return _guard(() async {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/auth/verify-email'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'email': email, 'otp': otp}),
+          )
+          .timeout(AppConstants.requestTimeout);
 
-    return _handleResponse(response);
+      return _handleResponse(response);
+    });
   }
 
   // ============================================================
@@ -155,15 +283,17 @@ class ApiClient {
   static Future<Map<String, dynamic>> resendVerification({
     required String email,
   }) async {
-    final response = await http
-        .post(
-          Uri.parse('$baseUrl/auth/resend-verification'),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({'email': email}),
-        )
-        .timeout(AppConstants.requestTimeout);
+    return _guard(() async {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/auth/resend-verification'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'email': email}),
+          )
+          .timeout(AppConstants.requestTimeout);
 
-    return _handleResponse(response);
+      return _handleResponse(response);
+    });
   }
 
   // ============================================================
@@ -174,15 +304,17 @@ class ApiClient {
     required String email,
     required String password,
   }) async {
-    final response = await http
-        .post(
-          Uri.parse('$baseUrl/auth/login'),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({'email': email, 'password': password}),
-        )
-        .timeout(AppConstants.requestTimeout);
+    return _guard(() async {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/auth/login'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'email': email, 'password': password}),
+          )
+          .timeout(AppConstants.requestTimeout);
 
-    return _handleResponse(response);
+      return _handleResponse(response);
+    });
   }
 
   // ============================================================
@@ -192,29 +324,32 @@ class ApiClient {
   static Future<Map<String, dynamic>> socialLogin(
     String firebaseIdToken,
   ) async {
-    final response = await http
-        .post(
-          Uri.parse('$baseUrl/auth/social-login'),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({'id_token': firebaseIdToken}),
-        )
-        .timeout(AppConstants.requestTimeout);
+    return _guard(() async {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/auth/social-login'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'id_token': firebaseIdToken}),
+          )
+          .timeout(AppConstants.requestTimeout);
 
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      debugPrint(
-        '[ApiClient] social-login failed with status ${response.statusCode}: ${response.body}',
-      );
-      String errorMessage = 'Backend login failed (HTTP ${response.statusCode})';
-      try {
-        final decoded = jsonDecode(response.body);
-        if (decoded is Map && decoded.containsKey('detail')) {
-          errorMessage = '${decoded['detail']} (HTTP ${response.statusCode})';
-        }
-      } catch (_) {}
-      throw Exception(errorMessage);
-    }
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        debugPrint(
+          '[ApiClient] social-login failed with status ${response.statusCode}: ${response.body}',
+        );
+        String errorMessage =
+            'Backend login failed (HTTP ${response.statusCode})';
+        try {
+          final decoded = jsonDecode(response.body);
+          if (decoded is Map && decoded.containsKey('detail')) {
+            errorMessage = '${decoded['detail']} (HTTP ${response.statusCode})';
+          }
+        } catch (_) {}
+        throw Exception(errorMessage);
+      }
 
-    return _handleResponse(response);
+      return _handleResponse(response);
+    });
   }
 
   // ============================================================
@@ -242,17 +377,19 @@ class ApiClient {
   // ============================================================
 
   static Future<Map<String, dynamic>> me(String accessToken) async {
-    final response = await http
-        .get(
-          Uri.parse('$baseUrl/auth/me'),
-          headers: {
-            'Authorization': 'Bearer $accessToken',
-            'Accept': 'application/json',
-          },
-        )
-        .timeout(AppConstants.requestTimeout);
+    return _guard(() async {
+      final response = await http
+          .get(
+            Uri.parse('$baseUrl/auth/me'),
+            headers: {
+              'Authorization': 'Bearer $accessToken',
+              'Accept': 'application/json',
+            },
+          )
+          .timeout(AppConstants.requestTimeout);
 
-    return _handleResponse(response);
+      return _handleResponse(response);
+    });
   }
 
   static Future<Map<String, dynamic>> updateRole({
@@ -712,16 +849,14 @@ class ApiClient {
   }
 
   static Future<Map<String, dynamic>> completeLesson({
-    required String accessToken,
+    String? accessToken,
     required String lessonId,
   }) async {
+    final headers = await _authHeaders(token: accessToken);
     final response = await http
         .post(
           Uri.parse('$baseUrl/lessons/$lessonId/complete'),
-          headers: {
-            'Authorization': 'Bearer $accessToken',
-            'Accept': 'application/json',
-          },
+          headers: headers,
         )
         .timeout(AppConstants.requestTimeout);
 

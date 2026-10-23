@@ -2,7 +2,7 @@ class AppAssets {
   AppAssets._();
 
   // Logos
-  static const logo = 'assets/images/logos/logo.png';
+  static const logo = 'assets/icon/app_logo.png';
 
   // Backgrounds
   static const loginBackground = 'assets/images/backgrounds/login_bg.png';

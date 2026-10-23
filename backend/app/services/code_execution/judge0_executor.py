@@ -123,6 +123,15 @@ class Judge0Executor(BaseCodeExecutor):
             response.raise_for_status()
             return self._parse_judge0_response(response.json())
         except Exception as e:
+            if lang_key in ("python", "python3", "py"):
+                from app.services.code_execution.subprocess_executor import SubprocessExecutor
+                return SubprocessExecutor().execute(
+                    source_code=source_code,
+                    language=language,
+                    stdin_input=stdin_input,
+                    time_limit_ms=time_limit_ms,
+                    memory_limit_mb=memory_limit_mb,
+                )
             return ExecutionResult(
                 stdout="",
                 stderr=f"Judge0 execution error: {str(e)}",
@@ -194,5 +203,19 @@ class Judge0Executor(BaseCodeExecutor):
                     source_code, language, stdin_input, time_limit_ms, memory_limit_mb
                 )
                 tasks.append(self._execute_single_async(client, payload, endpoint))
-            return await asyncio.gather(*tasks)
+            results = await asyncio.gather(*tasks)
+
+            # If Judge0 execution failed and language is Python, fallback gracefully to SubprocessExecutor
+            if results and any(r.compile_error and "Judge0 execution error:" in r.stderr for r in results):
+                if lang_key in ("python", "python3", "py"):
+                    from app.services.code_execution.subprocess_executor import SubprocessExecutor
+                    return await SubprocessExecutor().execute_batch_async(
+                        source_code=source_code,
+                        language=language,
+                        test_inputs=test_inputs,
+                        time_limit_ms=time_limit_ms,
+                        memory_limit_mb=memory_limit_mb,
+                    )
+
+            return results
 

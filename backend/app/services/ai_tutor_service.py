@@ -99,16 +99,69 @@ class AITutorService:
         """Execute the LLM call using configured provider (Gemini or OpenAI)."""
         provider = (settings.AI_PROVIDER or "").lower()
         if provider == "gemini":
-            import google.generativeai as genai
-            genai.configure(api_key=settings.AI_API_KEY)
-            model = genai.GenerativeModel(
-                model_name=settings.AI_MODEL or "gemini-1.5-flash",
-                system_instruction=system_prompt,
-                generation_config={"temperature": 0.4},
-            )
-            response = model.generate_content(user_prompt)
-            if response and response.text:
-                return response.text.strip()
+            import requests
+
+            api_key = settings.AI_API_KEY
+            if not api_key:
+                return "AI Tutor is not configured. Missing API key."
+
+            candidates = []
+            if settings.AI_MODEL:
+                candidates.append(settings.AI_MODEL)
+            for m in ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-3.5-flash", "gemini-3.1-flash-lite"]:
+                if m not in candidates:
+                    candidates.append(m)
+
+            payload: dict[str, Any] = {
+                "contents": [
+                    {
+                        "role": "user",
+                        "parts": [{"text": user_prompt}]
+                    }
+                ],
+                "generationConfig": {
+                    "temperature": 0.4
+                }
+            }
+            if system_prompt:
+                payload["systemInstruction"] = {
+                    "role": "user",
+                    "parts": [{"text": system_prompt}]
+                }
+
+            headers = {"Content-Type": "application/json"}
+            for model_name in candidates:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+                try:
+                    resp = requests.post(url, headers=headers, json=payload, timeout=15)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        candidates_data = data.get("candidates", [])
+                        if candidates_data:
+                            parts = candidates_data[0].get("content", {}).get("parts", [])
+                            text_parts = [p.get("text", "") for p in parts if "text" in p]
+                            if text_parts:
+                                return "".join(text_parts).strip()
+                    else:
+                        logger.warning(f"Gemini model {model_name} returned HTTP {resp.status_code}: {resp.text}")
+                except Exception as e:
+                    logger.warning(f"Error calling Gemini model {model_name}: {e}")
+
+            # SDK Fallback
+            try:
+                import google.generativeai as genai
+                genai.configure(api_key=api_key)
+                model = genai.GenerativeModel(
+                    model_name=settings.AI_MODEL or "gemini-1.5-flash",
+                    system_instruction=system_prompt,
+                    generation_config={"temperature": 0.4},
+                )
+                response = model.generate_content(user_prompt)
+                if response and response.text:
+                    return response.text.strip()
+            except Exception as e:
+                logger.warning(f"Gemini SDK fallback failed: {e}")
+
             return "Unable to generate a hint at this moment. Please try again."
 
         elif provider == "openai":

@@ -5,7 +5,7 @@ class AppConstants {
 
   static const apiVersion = 'v1';
 
-  static const requestTimeout = Duration(seconds: 30);
+  static const requestTimeout = Duration(seconds: 60);
 
   static const pageSize = 20;
 }

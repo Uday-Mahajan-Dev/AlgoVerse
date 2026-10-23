@@ -297,9 +297,21 @@ class AuthNotifier extends Notifier<AuthState> {
 
       return role;
     } catch (e) {
+      String msg = e.toString().replaceFirst('Exception: ', '').trim();
+      final lower = msg.toLowerCase();
+      if (lower.contains('timeoutexception') ||
+          lower.contains('0:00:30') ||
+          lower.contains('0:01:00') ||
+          lower.contains('timed out') ||
+          lower.contains('socketexception') ||
+          lower.contains('connection refused') ||
+          lower.contains('failed host lookup') ||
+          lower.contains('network is unreachable')) {
+        msg = 'Server is spinning up, please wait a moment and try again.';
+      }
       state = state.copyWith(
         isLoading: false,
-        errorMessage: e.toString().replaceFirst('Exception: ', ''),
+        errorMessage: msg,
       );
       rethrow;
     }
@@ -353,4 +365,5 @@ final authStateProvider =
     NotifierProvider<AuthNotifier, AuthState>(AuthNotifier.new);
 
 final authNotifierProvider = authStateProvider;
+final authProvider = authStateProvider;
 

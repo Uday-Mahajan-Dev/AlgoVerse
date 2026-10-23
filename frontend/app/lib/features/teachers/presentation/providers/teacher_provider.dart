@@ -98,3 +98,5 @@ final classroomSettingsProvider =
 
   return ApiClient.getClassroomSettings(accessToken: token);
 });
+
+final classroomStatsProvider = classroomSettingsProvider;

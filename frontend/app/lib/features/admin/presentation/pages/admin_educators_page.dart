@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/token_storage.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 
-class AdminEducatorsPage extends StatefulWidget {
+class AdminEducatorsPage extends ConsumerStatefulWidget {
   const AdminEducatorsPage({super.key});
 
   @override
-  State<AdminEducatorsPage> createState() => _AdminEducatorsPageState();
+  ConsumerState<AdminEducatorsPage> createState() => _AdminEducatorsPageState();
 }
 
-class _AdminEducatorsPageState extends State<AdminEducatorsPage> {
+class _AdminEducatorsPageState extends ConsumerState<AdminEducatorsPage> {
   bool _isLoading = true;
   String? _error;
   List<dynamic> _educators = [];
@@ -89,41 +91,99 @@ class _AdminEducatorsPageState extends State<AdminEducatorsPage> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Row(
-          children: [
-            Icon(Icons.admin_panel_settings_rounded, color: Colors.indigo),
-            SizedBox(width: 10),
-            Text('Faculty Verification Gate', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-          ],
-        ),
-        actions: [
-          Row(
+        titleSpacing: 16,
+        title: const FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
+              Icon(Icons.admin_panel_settings_rounded, color: Colors.indigo),
+              SizedBox(width: 8),
               Text(
-                _includeAll ? 'All Faculty' : 'Pending Only',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey),
+                'Faculty Verification Gate',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
               ),
-              Switch(
-                value: _includeAll,
-                activeThumbColor: Colors.indigo,
-                onChanged: (val) {
-                  setState(() => _includeAll = val);
-                  _loadEducators();
-                },
-              ),
-              IconButton(
-                icon: const Icon(Icons.refresh_rounded),
-                onPressed: _loadEducators,
-                tooltip: 'Refresh',
-              ),
-              const SizedBox(width: 8),
             ],
           ),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.red),
+            tooltip: 'Logout',
+            onPressed: () async {
+              final shouldLogout = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Admin Logout'),
+                  content: const Text(
+                      'Are you sure you want to log out of the admin panel?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(false),
+                      child: const Text('Cancel'),
+                    ),
+                    FilledButton(
+                      style:
+                          FilledButton.styleFrom(backgroundColor: Colors.red),
+                      onPressed: () => Navigator.of(ctx).pop(true),
+                      child: const Text('Logout'),
+                    ),
+                  ],
+                ),
+              );
+              if (shouldLogout == true && context.mounted) {
+                await ref.read(authProvider.notifier).logout(context: context);
+              }
+            },
+          ),
+          const SizedBox(width: 8),
         ],
         backgroundColor: Colors.white,
         elevation: 0,
       ),
-      body: _buildBody(),
+      body: Column(
+        children: [
+          // Filter & Control Bar below AppBar
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.filter_list_rounded,
+                    size: 18, color: Colors.grey.shade700),
+                const SizedBox(width: 8),
+                Text(
+                  _includeAll ? 'All Faculty' : 'Pending Only',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade800,
+                  ),
+                ),
+                const Spacer(),
+                Switch(
+                  value: _includeAll,
+                  activeThumbColor: Colors.indigo,
+                  onChanged: (val) {
+                    setState(() => _includeAll = val);
+                    _loadEducators();
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh_rounded),
+                  onPressed: _loadEducators,
+                  tooltip: 'Refresh',
+                ),
+              ],
+            ),
+          ),
+          Expanded(child: _buildBody()),
+        ],
+      ),
     );
   }
 

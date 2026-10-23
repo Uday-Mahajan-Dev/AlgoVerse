@@ -73,9 +73,10 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
       if (!mounted) return;
 
       ref.invalidate(teacherMentorshipRequestsProvider);
+      ref.invalidate(classroomStatsProvider);
+      ref.invalidate(classroomSettingsProvider);
       ref.invalidate(teacherStudentsProvider);
       ref.invalidate(teacherOverviewProvider);
-      ref.invalidate(classroomSettingsProvider);
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -146,10 +147,13 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
                             mainAxisAlignment:
                                 MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text(
-                                'Max Classroom Capacity:',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.w600, fontSize: 14),
+                              const Expanded(
+                                child: Text(
+                                  'Max Classroom Capacity:',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.w600, fontSize: 14),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                               Container(
                                 padding: const EdgeInsets.symmetric(
@@ -326,22 +330,9 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Header & Action Bar
-                            _buildHeader(context, overviewAsync.value),
+                            // Header & Action Bar (includes Class Joining Code & Mentorship Inbox)
+                            _buildHeader(context, overviewAsync.value, mentorshipRequestsAsync),
                             const SizedBox(height: 24),
-
-                            // Mentorship Requests Inbox (Phase 1)
-                            mentorshipRequestsAsync.when(
-                              data: (requests) => _buildMentorshipRequestsCard(
-                                context,
-                                requests,
-                                overviewAsync.value?.totalStudents ?? 0,
-                                overviewAsync.value?.maxStudents ?? 100,
-                                isVerified: overviewAsync.value?.isVerified ?? true,
-                              ),
-                              loading: () => const SizedBox.shrink(),
-                              error: (e, s) => const SizedBox.shrink(),
-                            ),
 
                             // TA Approval Requests (if any)
                             taRequestsAsync.when(
@@ -646,7 +637,9 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
     int maxCapacity, {
     bool isVerified = true,
   }) {
-    final pending = requests.where((r) => r.isPending).toList();
+    final pending = requests
+        .where((r) => r.status.trim().toUpperCase() == 'PENDING')
+        .toList();
     if (pending.isEmpty) return const SizedBox.shrink();
 
     final isAtCapacity = currentEnrolled >= maxCapacity;
@@ -854,13 +847,17 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
                                 foregroundColor: Colors.red.shade700,
                                 side: BorderSide(color: Colors.red.shade300),
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 14, vertical: 8),
+                                    horizontal: 16, vertical: 10),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
                               ),
                               icon: const Icon(Icons.close_rounded, size: 16),
                               label: const Text('Reject',
-                                  style: TextStyle(fontSize: 12)),
+                                  style: TextStyle(
+                                      fontSize: 13, fontWeight: FontWeight.bold)),
                             ),
-                            const SizedBox(width: 10),
+                            const SizedBox(width: 12),
                             FilledButton.icon(
                               onPressed: (isAtCapacity || !isVerified)
                                   ? null
@@ -869,15 +866,18 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
                               style: FilledButton.styleFrom(
                                 backgroundColor: const Color(0xFF10B981),
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 8),
+                                    horizontal: 18, vertical: 10),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
                               ),
                               icon: const Icon(Icons.check_rounded, size: 16),
                               label: Text(
                                 !isVerified
                                     ? 'Verify Req'
-                                    : (isAtCapacity ? 'Roster Full' : 'Approve Mentee'),
+                                    : (isAtCapacity ? 'Roster Full' : 'Approve'),
                                 style: const TextStyle(
-                                    fontSize: 12, fontWeight: FontWeight.bold),
+                                    fontSize: 13, fontWeight: FontWeight.bold),
                               ),
                             ),
                           ],
@@ -895,7 +895,9 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
   }
 
   Widget _buildHeader(
-      BuildContext context, TeacherOverviewEntity? overview) {
+      BuildContext context,
+      TeacherOverviewEntity? overview,
+      AsyncValue<List<MentorshipRequestEntity>> mentorshipRequestsAsync) {
     final userProfileAsync = ref.watch(currentUserProfileProvider);
     final classCode =
         userProfileAsync.value?['class_code']?.toString() ?? '';
@@ -1149,6 +1151,18 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
             ),
           ),
         ],
+        const SizedBox(height: 16),
+        mentorshipRequestsAsync.when(
+          data: (requests) => _buildMentorshipRequestsCard(
+            context,
+            requests,
+            totalEnrolled,
+            maxCapacity,
+            isVerified: isVerified,
+          ),
+          loading: () => const SizedBox.shrink(),
+          error: (e, s) => const SizedBox.shrink(),
+        ),
       ],
     );
   }

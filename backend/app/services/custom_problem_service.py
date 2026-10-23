@@ -606,7 +606,7 @@ class CustomProblemService:
             student = db.scalar(select(User).where(User.id == a.student_id))
             is_class_student = a.student_id in class_student_ids
             
-            student_name = (f"{student.first_name or ''} {student.last_name or ''}".strip() or student.username) if (student and is_class_student) else "Anonymous Student"
+            student_name = (f"{student.first_name or ''} {student.last_name or ''}".strip() or student.username) if student else "Student"
             
             roster_stats.append({
                 "assignment_id": str(a.id),

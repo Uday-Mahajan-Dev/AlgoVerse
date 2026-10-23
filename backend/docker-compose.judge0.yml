@@ -13,7 +13,9 @@ services:
     ports:
       - "2358:2358"
     environment:
-      - REDIS_HOST=redis
+      - REDIS_HOST=172.18.0.2
+      - REDIS_PORT=6379
+      - RAILS_SERVER_PROCESSES=0
       - POSTGRES_HOST=db
       - POSTGRES_USER=judge0
       - POSTGRES_PASSWORD=judge0

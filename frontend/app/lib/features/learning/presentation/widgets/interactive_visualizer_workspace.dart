@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../../core/network/api_client.dart';
 import '../../domain/entities/execution_trace.dart';
 import '../../engine/array_algorithm_executor.dart';
 import 'ai_tutor_panel.dart';
@@ -14,11 +15,15 @@ import 'visualizer_controls.dart';
 class InteractiveVisualizerWorkspace extends StatefulWidget {
   final Map<String, dynamic> contentJson;
   final String? lessonId;
+  final VoidCallback? onLessonCompleted;
+  final bool? isLessonCompleted;
 
   const InteractiveVisualizerWorkspace({
     super.key,
     required this.contentJson,
     this.lessonId,
+    this.onLessonCompleted,
+    this.isLessonCompleted,
   });
 
   @override
@@ -38,6 +43,21 @@ class _InteractiveVisualizerWorkspaceState
   double _playbackSpeed = 1.0;
   Timer? _playbackTimer;
   bool _showAITutor = false;
+  bool _hasTriggeredCompletion = false;
+
+  void _checkAutoComplete() {
+    if (_currentStepIndex >= _trace.totalSteps - 1 &&
+        !_hasTriggeredCompletion &&
+        !(widget.isLessonCompleted ?? false)) {
+      _hasTriggeredCompletion = true;
+      if (widget.onLessonCompleted != null) {
+        widget.onLessonCompleted!();
+      } else if (widget.lessonId != null && widget.lessonId!.isNotEmpty) {
+        ApiClient.completeLesson(lessonId: widget.lessonId!)
+            .catchError((_) => <String, dynamic>{});
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -114,7 +134,11 @@ class _InteractiveVisualizerWorkspaceState
         setState(() {
           _currentStepIndex++;
         });
+        if (_currentStepIndex >= _trace.totalSteps - 1) {
+          _checkAutoComplete();
+        }
       } else {
+        _checkAutoComplete();
         _stopPlayback();
       }
     });
@@ -164,6 +188,9 @@ class _InteractiveVisualizerWorkspaceState
       setState(() {
         _currentStepIndex++;
       });
+      if (_currentStepIndex >= _trace.totalSteps - 1) {
+        _checkAutoComplete();
+      }
     }
   }
 
@@ -185,9 +212,13 @@ class _InteractiveVisualizerWorkspaceState
 
   void _seek(int step) {
     _stopPlayback();
+    final target = step.clamp(0, _trace.totalSteps - 1);
     setState(() {
-      _currentStepIndex = step.clamp(0, _trace.totalSteps - 1);
+      _currentStepIndex = target;
     });
+    if (target >= _trace.totalSteps - 1) {
+      _checkAutoComplete();
+    }
   }
 
   @override
@@ -268,14 +299,12 @@ class _InteractiveVisualizerWorkspaceState
       final langMap = lineMaps[_selectedLanguage];
       if (langMap is Map) {
         final mapped = langMap[baseLine.toString()] ?? langMap[baseLine];
-        if (mapped is int) return mapped;
-        return int.tryParse(mapped?.toString() ?? '') ?? 0;
-      } else {
-        // Fallback: if line_maps[selected] missing → disable line highlight for that language
-        return 0;
+        if (mapped is int && mapped > 0) return mapped;
+        final parsed = int.tryParse(mapped?.toString() ?? '');
+        if (parsed != null && parsed > 0) return parsed;
       }
     }
-    return _selectedLanguage == 'python' ? baseLine : 0;
+    return baseLine;
   }
 
   @override
@@ -497,6 +526,7 @@ class _InteractiveVisualizerWorkspaceState
             ],
             if (activeSnippet.isNotEmpty) ...[
               CodeViewerWidget(
+                key: ValueKey('code_viewer_${_selectedLanguage}_${_selectedAlgorithm}_${activeSnippet.hashCode}'),
                 codeSnippet: activeSnippet,
                 activeSourceLine: activeLine,
                 explanation: currentStep?.explanation ?? '',
