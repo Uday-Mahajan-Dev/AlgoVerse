@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/constants/dob_constants.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/token_storage.dart';
 
@@ -28,6 +29,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
   bool _isSaving = false;
   String? _errorMessage;
 
+  bool _isDobLocked = false;
+
   @override
   void initState() {
     super.initState();
@@ -39,6 +42,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _instagramController = TextEditingController(text: data['instagram_url']?.toString() ?? '');
     _linkedinController = TextEditingController(text: data['linkedin_url']?.toString() ?? '');
     _countryController = TextEditingController(text: data['country']?.toString() ?? '');
+
+    _isDobLocked = data['is_dob_locked'] == true;
 
     final dobStr = data['date_of_birth']?.toString();
     if (dobStr != null && dobStr.isNotEmpty) {
@@ -80,6 +85,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
         _linkedinController.text = user['linkedin_url']?.toString() ?? '';
         _countryController.text = user['country']?.toString() ?? '';
 
+        _isDobLocked = user['is_dob_locked'] == true;
+
         final dobStr = user['date_of_birth']?.toString();
         if (dobStr != null && dobStr.isNotEmpty) {
           _selectedDob = DateTime.tryParse(dobStr);
@@ -92,13 +99,22 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   Future<void> _selectDob() async {
-    final now = DateTime.now();
-    final initial = _selectedDob ?? DateTime(now.year - 20, now.month, now.day);
+    if (_isDobLocked) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Contact admin to change date of birth.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    final initial = DobConstants.initialPickerDate(_selectedDob);
     final picked = await showDatePicker(
       context: context,
       initialDate: initial,
-      firstDate: DateTime(1930),
-      lastDate: now,
+      firstDate: DobConstants.minBirthDate,
+      lastDate: DobConstants.maxBirthDate,
       helpText: 'Select Date of Birth',
     );
 
@@ -271,7 +287,31 @@ class _EditProfilePageState extends State<EditProfilePage> {
                           const SizedBox(height: 18),
 
                           // Date of Birth Field
-                          _buildFieldLabel('Date of Birth'),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              _buildFieldLabel('Date of Birth'),
+                              if (_isDobLocked)
+                                const Tooltip(
+                                  message: 'Contact admin to change',
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.lock_rounded, size: 14, color: Colors.amber),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        'Locked',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.amber,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
                           InkWell(
                             onTap: _selectDob,
                             borderRadius: BorderRadius.circular(14),
@@ -279,14 +319,25 @@ class _EditProfilePageState extends State<EditProfilePage> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 16, vertical: 14),
                               decoration: BoxDecoration(
-                                border: Border.all(color: Colors.grey.shade300),
+                                border: Border.all(
+                                  color: _isDobLocked
+                                      ? Colors.amber.shade200
+                                      : Colors.grey.shade300,
+                                ),
                                 borderRadius: BorderRadius.circular(14),
-                                color: Colors.grey.shade50,
+                                color: _isDobLocked
+                                    ? Colors.amber.shade50.withValues(alpha: 0.3)
+                                    : Colors.grey.shade50,
                               ),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.cake_outlined,
-                                      color: Colors.indigo, size: 20),
+                                  Icon(
+                                    _isDobLocked
+                                        ? Icons.lock_outline_rounded
+                                        : Icons.cake_outlined,
+                                    color: _isDobLocked ? Colors.amber.shade800 : Colors.indigo,
+                                    size: 20,
+                                  ),
                                   const SizedBox(width: 12),
                                   Text(
                                     _selectedDob != null
@@ -300,8 +351,15 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                     ),
                                   ),
                                   const Spacer(),
-                                  Icon(Icons.calendar_month_rounded,
-                                      size: 18, color: Colors.grey.shade600),
+                                  if (_isDobLocked)
+                                    const Tooltip(
+                                      message: 'Contact admin to change',
+                                      child: Icon(Icons.lock_rounded,
+                                          size: 18, color: Colors.amber),
+                                    )
+                                  else
+                                    Icon(Icons.calendar_month_rounded,
+                                        size: 18, color: Colors.grey.shade600),
                                 ],
                               ),
                             ),

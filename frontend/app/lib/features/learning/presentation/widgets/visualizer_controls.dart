@@ -107,10 +107,13 @@ class VisualizerControls extends StatelessWidget {
                     ],
                   ),
                 ),
-                itemBuilder: (context) => [
-                  const PopupMenuItem(value: 0.5, child: Text('0.5x Speed')),
-                  const PopupMenuItem(value: 1.0, child: Text('1.0x Speed')),
-                  const PopupMenuItem(value: 2.0, child: Text('2.0x Speed')),
+                itemBuilder: (context) => const [
+                  PopupMenuItem(value: 0.25, child: Text('0.25x Speed')),
+                  PopupMenuItem(value: 0.5, child: Text('0.5x Speed')),
+                  PopupMenuItem(value: 1.0, child: Text('1.0x Speed')),
+                  PopupMenuItem(value: 1.5, child: Text('1.5x Speed')),
+                  PopupMenuItem(value: 2.0, child: Text('2.0x Speed')),
+                  PopupMenuItem(value: 4.0, child: Text('4.0x Speed')),
                 ],
               ),
             ],

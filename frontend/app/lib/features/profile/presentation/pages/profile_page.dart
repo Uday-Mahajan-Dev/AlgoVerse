@@ -5,9 +5,11 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/constants/app_routes.dart';
+import '../../../../core/constants/dob_constants.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/token_storage.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../data/google_birthday_service.dart';
 
 class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
@@ -23,6 +25,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   bool _isAuthError = false;
   Map<String, dynamic>? _userData;
   List<dynamic> _badges = [];
+  Map<String, dynamic>? _educatorApplication;
+  bool _isImportingGoogleDob = false;
 
   @override
   void initState() {
@@ -58,10 +62,21 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         badges = [];
       }
 
+      Map<String, dynamic>? appData;
+      try {
+        appData = await ApiClient.getMyEducatorApplication(accessToken: token);
+      } catch (_) {
+        appData = null;
+      }
+
+      // Re-fetch role and update Riverpod state seamlessly without forcing logout
+      ref.read(authNotifierProvider.notifier).refreshCurrentUser();
+
       if (mounted) {
         setState(() {
           _userData = data;
           _badges = badges;
+          _educatorApplication = appData;
           _isLoading = false;
         });
       }
@@ -100,6 +115,137 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           SnackBar(content: Text('Link copied to clipboard: $formattedUrl')),
         );
       }
+    }
+  }
+
+  Future<void> _pickAndSaveDob() async {
+    final token = await TokenStorage.getAccessToken();
+    if (token == null || !mounted) return;
+
+    final isLocked = _userData?['is_dob_locked'] == true;
+    if (isLocked) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Contact admin to change date of birth.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    final currentDobStr = _userData?['date_of_birth']?.toString();
+    final currentDob = currentDobStr != null ? DateTime.tryParse(currentDobStr) : null;
+    final initial = DobConstants.initialPickerDate(currentDob);
+
+    if (!mounted) return;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DobConstants.minBirthDate,
+      lastDate: DobConstants.maxBirthDate,
+      helpText: 'Select Date of Birth',
+    );
+
+    if (picked != null) {
+      final y = picked.year.toString().padLeft(4, '0');
+      final m = picked.month.toString().padLeft(2, '0');
+      final d = picked.day.toString().padLeft(2, '0');
+      final dobStr = '$y-$m-$d';
+
+      try {
+        await ApiClient.updateProfile(
+          accessToken: token,
+          dateOfBirth: dobStr,
+          dobSource: 'MANUAL',
+        );
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Date of birth updated successfully!'),
+            backgroundColor: Color(0xFF10B981),
+          ),
+        );
+        _loadProfileAndBadges();
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceAll('Exception: ', '').trim()),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _importFromGoogle() async {
+    setState(() => _isImportingGoogleDob = true);
+    final error = await GoogleBirthdayService.importBirthdayExplicitly();
+    if (!mounted) return;
+    setState(() => _isImportingGoogleDob = false);
+
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error),
+          backgroundColor: Colors.orange.shade800,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Date of birth imported successfully from Google!'),
+          backgroundColor: Color(0xFF10B981),
+        ),
+      );
+      _loadProfileAndBadges();
+    }
+  }
+
+  Future<void> _cancelEducatorApplication() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cancel Educator Application'),
+        content: const Text(
+          'Are you sure you want to cancel your pending educator application? You may submit a new application later.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Keep Application'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Yes, Cancel'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      final token = await TokenStorage.getAccessToken();
+      if (token == null) return;
+      await ApiClient.cancelMyEducatorApplication(accessToken: token);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Educator application cancelled.'),
+          backgroundColor: Colors.blueGrey,
+        ),
+      );
+      _loadProfileAndBadges();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to cancel: ${e.toString().replaceAll('Exception: ', '')}'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
     }
   }
 
@@ -340,6 +486,20 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     final linkedinUrl = _userData?['linkedin_url']?.toString();
     final country = _userData?['country']?.toString();
 
+    final dob = _userData?['date_of_birth']?.toString();
+    final dobSource = _userData?['dob_source']?.toString();
+    final isDobLocked = _userData?['is_dob_locked'] == true;
+    final parsedDob = dob != null ? DateTime.tryParse(dob) : null;
+    final age = DobConstants.computeAge(parsedDob);
+
+    final authProviders = (_userData?['auth_providers'] as List<dynamic>?)
+            ?.map((e) => e.toString().toLowerCase())
+            .toList() ??
+        [];
+    final isGoogleUser = authProviders.any((p) => p.contains('google')) ||
+        email.toLowerCase().endsWith('@gmail.com') ||
+        dobSource == 'GOOGLE';
+
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -451,6 +611,105 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                       color: roleColor,
                     ),
                   ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            // Date of Birth Row
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                alignment: WrapAlignment.center,
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  Icon(
+                    isDobLocked ? Icons.lock_outline_rounded : Icons.cake_outlined,
+                    size: 16,
+                    color: isDobLocked ? Colors.amber.shade800 : Colors.indigo,
+                  ),
+                  if (dob != null && dob.isNotEmpty) ...[
+                    Text(
+                      'DOB: $dob${age != null ? " ($age yrs)" : ""}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade800,
+                      ),
+                    ),
+                    if (dobSource == 'GOOGLE') ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: Colors.blue.shade200),
+                        ),
+                        child: const Text('Google', style: TextStyle(fontSize: 10, color: Colors.blue, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                    if (isDobLocked)
+                      const Tooltip(
+                        message: 'Contact admin to change',
+                        child: Icon(Icons.lock_rounded, size: 14, color: Colors.amber),
+                      )
+                    else
+                      InkWell(
+                        onTap: _pickAndSaveDob,
+                        borderRadius: BorderRadius.circular(8),
+                        child: const Padding(
+                          padding: EdgeInsets.all(2),
+                          child: Icon(Icons.edit_outlined, size: 14, color: Colors.indigo),
+                        ),
+                      ),
+                  ] else ...[
+                    InkWell(
+                      onTap: _pickAndSaveDob,
+                      borderRadius: BorderRadius.circular(8),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Add date of birth',
+                            style: TextStyle(fontSize: 12, color: Colors.indigo, fontWeight: FontWeight.bold),
+                          ),
+                          SizedBox(width: 4),
+                          Icon(Icons.add_circle_outline_rounded, size: 14, color: Colors.indigo),
+                        ],
+                      ),
+                    ),
+                  ],
+                  if (isGoogleUser) ...[
+                    InkWell(
+                      onTap: _isImportingGoogleDob ? null : _importFromGoogle,
+                      borderRadius: BorderRadius.circular(6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: _isImportingGoogleDob
+                            ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.sync_rounded, size: 12, color: Colors.blue),
+                                  SizedBox(width: 4),
+                                  Text('Import from Google', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blue)),
+                                ],
+                              ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -764,6 +1023,173 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                 ),
               ],
+            ],
+          ),
+        ),
+      );
+    }
+
+    final appStatus = _educatorApplication?['status']?.toString().toUpperCase() ??
+        _userData?['educator_application_status']?.toString().toUpperCase();
+
+    if (appStatus == 'APPROVED') {
+      return const SizedBox.shrink();
+    }
+
+    if (appStatus == 'PENDING') {
+      final requestedRole = _educatorApplication?['requested_role']?.toString() ?? 'Educator';
+      final inst = _educatorApplication?['institution_name']?.toString() ?? 'Academic Institution';
+      final appliedAt = _educatorApplication?['created_at']?.toString();
+      final formattedDate = appliedAt != null && appliedAt.length >= 10
+          ? appliedAt.substring(0, 10)
+          : '';
+
+      return Card(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: BorderSide(color: Colors.amber.shade300),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(Icons.pending_actions_rounded, color: Colors.amber.shade900),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Application Under Admin Review',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          'Role: $requestedRole • $inst${formattedDate.isNotEmpty ? " • Applied $formattedDate" : ""}',
+                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'Your educator application is currently being reviewed by an AlgoVerse administrator. Once approved, your role will be upgraded and class features will unlock automatically.',
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade700, height: 1.4),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _cancelEducatorApplication,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.red.shade700,
+                    side: BorderSide(color: Colors.red.shade300),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  icon: const Icon(Icons.cancel_outlined, size: 18),
+                  label: const Text('Cancel Application'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (appStatus == 'REJECTED') {
+      final adminNote = _educatorApplication?['admin_note']?.toString();
+      return Card(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: BorderSide(color: Colors.red.shade200),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.error_outline_rounded, color: Colors.red),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Application Not Approved',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.red),
+                        ),
+                        Text(
+                          'Your previous educator application was reviewed and rejected.',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              if (adminNote != null && adminNote.trim().isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.red.shade200),
+                  ),
+                  child: Text(
+                    'Admin feedback: $adminNote',
+                    style: TextStyle(fontSize: 13, color: Colors.red.shade900),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () async {
+                    await context.push(AppRoutes.becomeEducator);
+                    _loadProfileAndBadges();
+                  },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.indigo,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text(
+                    'Apply Again',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
             ],
           ),
         ),

@@ -22,6 +22,8 @@ import '../features/splash/presentation/pages/splash_page.dart';
 import '../features/student_dashboard/presentation/pages/student_dashboard_page.dart';
 import '../features/teacher_dashboard/presentation/pages/teacher_dashboard_page.dart';
 import '../features/teacher_onboarding/presentation/pages/become_educator_page.dart';
+import '../features/learning/domain/entities/execution_trace.dart';
+import '../features/learning/presentation/pages/fullscreen_visualizer_page.dart';
 import '../features/teachers/presentation/pages/teacher_catalog_page.dart';
 import '../features/teachers/presentation/pages/teacher_profile_page.dart';
 
@@ -172,6 +174,37 @@ List<RouteBase> _buildRoutes() {
         final slug = state.pathParameters['slug'] ?? '';
         final lessonSlug = state.pathParameters['lessonSlug'] ?? '';
         return LessonViewPage(courseSlug: slug, lessonSlug: lessonSlug);
+      },
+    ),
+
+    GoRoute(
+      path: AppRoutes.visualizeFullscreen,
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>? ?? {};
+        final trace = extra['trace'] as ExecutionTrace? ??
+            const ExecutionTrace(algorithmName: 'visualizer', steps: []);
+        final algo = extra['algorithm']?.toString() ?? 'visualizer';
+        final input = extra['input'] as Map<String, dynamic>? ?? {};
+        final selectedLanguage =
+            extra['selectedLanguage']?.toString() ?? 'python';
+        final contentJson =
+            extra['contentJson'] as Map<String, dynamic>? ?? {};
+        final lessonId = extra['lessonId']?.toString();
+        final onLessonCompleted = extra['onLessonCompleted'] as VoidCallback?;
+        final isLessonCompleted = extra['isLessonCompleted'] as bool?;
+        final initialStepIndex = extra['initialStepIndex'] as int? ?? 0;
+
+        return FullscreenVisualizerPage(
+          trace: trace,
+          algorithm: algo,
+          input: input,
+          selectedLanguage: selectedLanguage,
+          contentJson: contentJson,
+          lessonId: lessonId,
+          onLessonCompleted: onLessonCompleted,
+          isLessonCompleted: isLessonCompleted,
+          initialStepIndex: initialStepIndex,
+        );
       },
     ),
   ];

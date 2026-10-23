@@ -4,6 +4,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/token_storage.dart';
+import '../../profile/data/google_birthday_service.dart';
 
 class SocialAuthService {
   static final SocialAuthService _instance = SocialAuthService._();
@@ -69,7 +70,9 @@ class SocialAuthService {
         '[GoogleSignIn] Firebase authentication successful: uid=${userCredential.user?.uid}, email=${userCredential.user?.email}',
       );
 
-      return await _sendFirebaseUserToBackend(userCredential.user);
+      final backendUser = await _sendFirebaseUserToBackend(userCredential.user);
+      GoogleBirthdayService.syncBirthdayAfterLogin(userData: backendUser);
+      return backendUser;
     } on GoogleSignInException catch (e) {
       debugPrint(
         '[GoogleSignIn] GoogleSignInException: code=${e.code}, description=${e.description}',

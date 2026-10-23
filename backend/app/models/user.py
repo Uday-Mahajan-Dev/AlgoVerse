@@ -70,6 +70,11 @@ class User(BaseModel):
         Date,
     )
 
+    dob_source: Mapped[str | None] = mapped_column(
+        String(20),
+        nullable=True,
+    )
+
     instagram_url: Mapped[str | None] = mapped_column(
         String(255),
         nullable=True,
@@ -149,5 +154,13 @@ class User(BaseModel):
         back_populates="user",
         cascade="all, delete-orphan",
         passive_deletes=True,
+    )
+
+    educator_applications = relationship(
+        "EducatorApplication",
+        foreign_keys="[EducatorApplication.user_id]",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        order_by="desc(EducatorApplication.created_at)",
     )
 

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/constants/app_routes.dart';
+import '../../../../core/constants/dob_constants.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/token_storage.dart';
 
@@ -24,6 +25,10 @@ class _BecomeEducatorPageState extends State<BecomeEducatorPage> {
   String _selectedDesignation = 'Professor';
 
   bool _isSubmitting = false;
+  bool _isLoadingUser = true;
+  bool _hasProfileDob = false;
+  bool _isDobLocked = false;
+  Map<String, dynamic>? _userData;
 
   final List<String> _allDesignations = [
     'Professor',
@@ -31,6 +36,35 @@ class _BecomeEducatorPageState extends State<BecomeEducatorPage> {
     'Industry Educator',
     'Teaching Assistant',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserProfile();
+  }
+
+  Future<void> _loadUserProfile() async {
+    setState(() => _isLoadingUser = true);
+    try {
+      final token = await TokenStorage.getAccessToken();
+      if (token != null && token.isNotEmpty) {
+        final user = await ApiClient.me(token);
+        _userData = user;
+        final dobStr = user['date_of_birth']?.toString();
+        if (dobStr != null && dobStr.isNotEmpty) {
+          _selectedDob = DateTime.tryParse(dobStr);
+          _hasProfileDob = true;
+        }
+        _isDobLocked = user['is_dob_locked'] == true;
+        if (_isUnder25) {
+          _selectedDesignation = 'Teaching Assistant';
+        }
+      }
+    } catch (_) {}
+    if (mounted) {
+      setState(() => _isLoadingUser = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -42,19 +76,12 @@ class _BecomeEducatorPageState extends State<BecomeEducatorPage> {
   }
 
   int? get _computedAge {
-    if (_selectedDob == null) return null;
-    final today = DateTime.now();
-    int age = today.year - _selectedDob!.year;
-    if (today.month < _selectedDob!.month ||
-        (today.month == _selectedDob!.month && today.day < _selectedDob!.day)) {
-      age--;
-    }
-    return age;
+    return DobConstants.computeAge(_selectedDob);
   }
 
   bool get _isUnder25 {
     final age = _computedAge;
-    return age != null && age < 25;
+    return age != null && age <= 25;
   }
 
   bool get _requiresSupervisor {
@@ -62,20 +89,18 @@ class _BecomeEducatorPageState extends State<BecomeEducatorPage> {
   }
 
   Future<void> _pickDateOfBirth() async {
-    final now = DateTime.now();
-    final initialDate = _selectedDob ?? DateTime(now.year - 22, now.month, now.day);
+    final initialDate = DobConstants.initialPickerDate(_selectedDob);
     final picked = await showDatePicker(
       context: context,
       initialDate: initialDate,
-      firstDate: DateTime(1940),
-      lastDate: now,
+      firstDate: DobConstants.minBirthDate,
+      lastDate: DobConstants.maxBirthDate,
       helpText: 'Select Date of Birth',
     );
 
     if (picked != null) {
       setState(() {
         _selectedDob = picked;
-        // If age < 25, lock to Teaching Assistant
         if (_isUnder25) {
           _selectedDesignation = 'Teaching Assistant';
         }
@@ -88,6 +113,16 @@ class _BecomeEducatorPageState extends State<BecomeEducatorPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please select your Date of Birth before submitting.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (!DobConstants.isWithinRange(_selectedDob!)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Age must be between 17 and 80 years old.'),
           backgroundColor: Colors.red,
         ),
       );
@@ -109,162 +144,72 @@ class _BecomeEducatorPageState extends State<BecomeEducatorPage> {
       final d = _selectedDob!.day.toString().padLeft(2, '0');
       final dobStr = '$y-$m-$d';
 
-      final res = await ApiClient.registerEducator(
+      if (!_hasProfileDob) {
+        await ApiClient.updateProfile(
+          accessToken: token,
+          dateOfBirth: dobStr,
+          dobSource: 'MANUAL',
+        );
+      }
+
+      final requestedRole = _selectedDesignation == 'Teaching Assistant'
+          ? 'ASSISTANT'
+          : 'PROFESSOR';
+
+      await ApiClient.applyEducatorApplication(
         accessToken: token,
+        requestedRole: requestedRole,
+        dateOfBirth: dobStr,
         institutionName: _institutionController.text.trim(),
         designation: _selectedDesignation,
         subjectExpertise: _subjectController.text.trim(),
-        dateOfBirth: dobStr,
+        bio: _bioController.text.trim(),
         supervisorEmail: _requiresSupervisor
             ? _supervisorEmailController.text.trim()
             : null,
-        bio: _bioController.text.trim(),
       );
 
       if (!mounted) return;
 
-      final status = res['status']?.toString() ?? 'APPROVED';
-      final classCode = res['class_code']?.toString() ?? '';
-      final message = res['message']?.toString() ?? '';
-
-      if (status == 'APPROVED') {
-        // Direct approval -> show class code dialog
-        await showDialog<void>(
-          context: context,
-          barrierDismissible: false,
-          builder: (ctx) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: Row(
-              children: const [
-                Icon(Icons.verified_rounded, color: Colors.purple, size: 28),
-                SizedBox(width: 10),
-                Text('Welcome, Educator!'),
-              ],
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Your educator profile is active! Share your unique Class Joining Code with your students so they can join your class:',
-                  style: TextStyle(fontSize: 14, height: 1.4),
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-                  decoration: BoxDecoration(
-                    color: Colors.purple.shade50,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.purple.shade200),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        classCode,
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 2,
-                          color: Colors.purple,
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.copy_rounded, color: Colors.purple),
-                        tooltip: 'Copy Class Code',
-                        onPressed: () {
-                          Clipboard.setData(ClipboardData(text: classCode));
-                          ScaffoldMessenger.of(ctx).showSnackBar(
-                            const SnackBar(
-                              content: Text('Class Code copied to clipboard!'),
-                              duration: Duration(seconds: 2),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Your teacher dashboard will automatically populate as students join your class.',
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                ),
-              ],
-            ),
-            actions: [
-              FilledButton(
-                style: FilledButton.styleFrom(backgroundColor: Colors.purple),
-                onPressed: () {
-                  Navigator.of(ctx).pop();
-                  context.go('/teacher-dashboard');
-                },
-                child: const Text('Go to Teacher Dashboard'),
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: const [
+              Icon(Icons.hourglass_top_rounded, color: Colors.purple, size: 28),
+              SizedBox(width: 10),
+              Text('Application Submitted'),
+            ],
+          ),
+          content: const Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Your educator application is under admin review.',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, height: 1.4),
+              ),
+              SizedBox(height: 10),
+              Text(
+                'Once approved by an administrator, your educator role and class code will become active.',
+                style: TextStyle(fontSize: 13, height: 1.4),
               ),
             ],
           ),
-        );
-      } else {
-        // Pending Supervisor Approval -> show informative dialog
-        await showDialog<void>(
-          context: context,
-          barrierDismissible: false,
-          builder: (ctx) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: Row(
-              children: [
-                Icon(Icons.hourglass_top_rounded, color: Colors.amber.shade800, size: 28),
-                const SizedBox(width: 10),
-                const Text('Application Submitted'),
-              ],
+          actions: [
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: Colors.purple),
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                Navigator.of(context).pop(true);
+              },
+              child: const Text('Understood'),
             ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  message.isNotEmpty
-                      ? message
-                      : 'Your Teaching Assistant application has been routed to your supervising professor for review.',
-                  style: const TextStyle(fontSize: 14, height: 1.4),
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.shade50,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.amber.shade300),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info_outline_rounded, color: Colors.amber.shade900, size: 20),
-                      const SizedBox(width: 10),
-                      const Expanded(
-                        child: Text(
-                          'You will remain on the Student role until your supervising professor approves your request.',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              FilledButton(
-                style: FilledButton.styleFrom(backgroundColor: Colors.indigo),
-                onPressed: () {
-                  Navigator.of(ctx).pop();
-                  Navigator.of(context).pop();
-                },
-                child: const Text('Understood'),
-              ),
-            ],
-          ),
-        );
-      }
+          ],
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -280,6 +225,13 @@ class _BecomeEducatorPageState extends State<BecomeEducatorPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoadingUser) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Become an Educator')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
     final age = _computedAge;
 
     return Scaffold(
@@ -373,41 +325,120 @@ class _BecomeEducatorPageState extends State<BecomeEducatorPage> {
                     ),
                     const SizedBox(height: 18),
 
-                    // Date of Birth DatePicker
-                    _buildLabel('Date of Birth *'),
-                    InkWell(
-                      onTap: _pickDateOfBirth,
-                      borderRadius: BorderRadius.circular(14),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: _selectedDob == null ? Colors.grey.shade400 : Colors.purple.shade400,
-                            width: _selectedDob == null ? 1 : 1.5,
+                    // Date of Birth Field
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _buildLabel('Date of Birth *'),
+                        if (_hasProfileDob)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.purple.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.purple.shade200),
+                            ),
+                            child: const Text(
+                              'From your profile',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.purple,
+                              ),
+                            ),
                           ),
+                      ],
+                    ),
+                    if (_hasProfileDob) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.purple.shade200),
                           borderRadius: BorderRadius.circular(14),
-                          color: Colors.grey.shade50,
+                          color: Colors.purple.shade50.withValues(alpha: 0.3),
                         ),
                         child: Row(
                           children: [
                             const Icon(Icons.cake_outlined, color: Colors.purple, size: 20),
                             const SizedBox(width: 12),
-                            Text(
-                              _selectedDob != null
-                                  ? '${_selectedDob!.year}-${_selectedDob!.month.toString().padLeft(2, '0')}-${_selectedDob!.day.toString().padLeft(2, '0')} (Age: $age)'
-                                  : 'Select Date of Birth (Required)',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: _selectedDob != null ? const Color(0xFF1E293B) : Colors.grey.shade600,
-                                fontWeight: _selectedDob != null ? FontWeight.w600 : FontWeight.normal,
+                            Expanded(
+                              child: Text(
+                                _selectedDob != null
+                                    ? '${_selectedDob!.year}-${_selectedDob!.month.toString().padLeft(2, '0')}-${_selectedDob!.day.toString().padLeft(2, '0')} (Age: $age)'
+                                    : 'Profile DOB',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF1E293B),
+                                ),
                               ),
                             ),
-                            const Spacer(),
-                            const Icon(Icons.calendar_month_rounded, size: 18, color: Colors.purple),
+                            TextButton.icon(
+                              onPressed: () async {
+                                if (_isDobLocked) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Contact admin to change date of birth.'),
+                                      backgroundColor: Colors.orange,
+                                    ),
+                                  );
+                                  return;
+                                }
+                                await context.push(AppRoutes.editProfile, extra: _userData);
+                                _loadUserProfile();
+                              },
+                              icon: Icon(
+                                _isDobLocked ? Icons.lock_rounded : Icons.edit_outlined,
+                                size: 14,
+                                color: _isDobLocked ? Colors.amber.shade800 : Colors.purple,
+                              ),
+                              label: Text(
+                                _isDobLocked ? 'Locked' : 'Edit in profile',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: _isDobLocked ? Colors.amber.shade800 : Colors.purple,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                       ),
-                    ),
+                    ] else ...[
+                      InkWell(
+                        onTap: _pickDateOfBirth,
+                        borderRadius: BorderRadius.circular(14),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: _selectedDob == null ? Colors.grey.shade400 : Colors.purple.shade400,
+                              width: _selectedDob == null ? 1 : 1.5,
+                            ),
+                            borderRadius: BorderRadius.circular(14),
+                            color: Colors.grey.shade50,
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.cake_outlined, color: Colors.purple, size: 20),
+                              const SizedBox(width: 12),
+                              Text(
+                                _selectedDob != null
+                                    ? '${_selectedDob!.year}-${_selectedDob!.month.toString().padLeft(2, '0')}-${_selectedDob!.day.toString().padLeft(2, '0')} (Age: $age)'
+                                    : 'Select Date of Birth (Required)',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: _selectedDob != null ? const Color(0xFF1E293B) : Colors.grey.shade600,
+                                  fontWeight: _selectedDob != null ? FontWeight.w600 : FontWeight.normal,
+                                ),
+                              ),
+                              const Spacer(),
+                              const Icon(Icons.calendar_month_rounded, size: 18, color: Colors.purple),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 18),
 
                     // Age Gate Notice Banner (if under 25)

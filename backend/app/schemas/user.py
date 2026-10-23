@@ -25,6 +25,7 @@ class UserBase(BaseModel):
     preferred_language: str | None = None
 
     date_of_birth: date | None = None
+    dob_source: str | None = None
 
     gender: str | None = None
 
@@ -52,6 +53,7 @@ class UserUpdate(BaseModel):
     preferred_language: str | None = None
 
     date_of_birth: date | None = None
+    dob_source: str | None = None
 
     gender: str | None = None
 
@@ -74,6 +76,9 @@ class UserResponse(UserBase):
     designation: str | None = None
     subject_expertise: str | None = None
     ta_application_status: str | None = None
+    educator_application_status: str | None = None
+    is_dob_locked: bool = False
+    auth_providers: list[str] = []
     is_verified: bool | None = None
 
     created_at: datetime
@@ -96,8 +101,13 @@ class UserResponse(UserBase):
             subject_expertise = user.teacher_profile.subject_expertise
 
         ta_application_status = None
+        educator_application_status = None
+        is_dob_locked = False
+
         if db is not None:
             from app.models.ta_approval_request import TAApprovalRequest
+            from app.models.educator_application import EducatorApplication
+
             pending_req = db.scalar(
                 select(TAApprovalRequest).where(
                     TAApprovalRequest.applicant_id == user.id,
@@ -106,6 +116,20 @@ class UserResponse(UserBase):
             )
             if pending_req:
                 ta_application_status = "PENDING"
+
+            latest_app = db.scalar(
+                select(EducatorApplication)
+                .where(EducatorApplication.user_id == user.id)
+                .order_by(EducatorApplication.created_at.desc())
+                .limit(1)
+            )
+            if latest_app:
+                educator_application_status = latest_app.status
+                if latest_app.status in ("PENDING", "APPROVED"):
+                    is_dob_locked = True
+
+        if getattr(user, "teacher_profile", None) and user.teacher_profile and user.teacher_profile.is_verified:
+            is_dob_locked = True
 
         return cls(
             username=user.username,
@@ -120,6 +144,7 @@ class UserResponse(UserBase):
             timezone=user.timezone,
             preferred_language=user.preferred_language,
             date_of_birth=user.date_of_birth,
+            dob_source=getattr(user, "dob_source", None),
             gender=user.gender,
             instagram_url=getattr(user, "instagram_url", None),
             linkedin_url=getattr(user, "linkedin_url", None),
@@ -134,6 +159,12 @@ class UserResponse(UserBase):
             designation=designation,
             subject_expertise=subject_expertise,
             ta_application_status=ta_application_status,
+            educator_application_status=educator_application_status,
+            is_dob_locked=is_dob_locked,
+            auth_providers=[
+                str(getattr(p, 'provider', '')).lower()
+                for p in getattr(user, 'auth_providers', [])
+            ],
             is_verified=getattr(user.teacher_profile, "is_verified", False) if hasattr(user, "teacher_profile") and user.teacher_profile else None,
             created_at=user.created_at,
             updated_at=user.updated_at,

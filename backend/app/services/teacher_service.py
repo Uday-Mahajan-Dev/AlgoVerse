@@ -218,164 +218,37 @@ class TeacherService:
                 detail="Teacher role not configured in database.",
             )
 
-        # Server-side age calculation
-        today = date.today()
-        age = today.year - date_of_birth.year - (
-            (today.month, today.day) < (date_of_birth.month, date_of_birth.day)
-        )
-
+        # Clean designation and determine requested role
         clean_desig = designation.strip()
-        is_ta = clean_desig.lower() == "teaching assistant"
+        is_ta = "assistant" in clean_desig.lower()
+        requested_role = "ASSISTANT" if is_ta else "PROFESSOR"
 
-        # Age gate validation
-        if age < 25 and not is_ta:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Educators under 25 years old must register through the Teaching Assistant (TA) pathway with supervisor professor approval.",
-            )
+        from app.schemas.educator_application import EducatorApplicationCreate
+        from app.services.educator_application_service import EducatorApplicationService
 
-        # Update user DOB and Bio
-        user.date_of_birth = date_of_birth
-        if bio:
-            user.bio = bio.strip()
-
-        # TA Approval Pathway
-        if age < 25 or is_ta:
-            if not supervisor_email or not supervisor_email.strip():
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="A valid supervising professor's email is required for Teaching Assistant applications or educators under 25.",
-                )
-
-            sup_email = supervisor_email.strip().lower()
-            supervisor = db.scalar(
-                select(User).where(
-                    func.lower(User.email) == sup_email,
-                    User.is_active.is_(True),
-                )
-            )
-            if not supervisor:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"No educator account found with email '{supervisor_email}'. Please verify your professor's email.",
-                )
-
-            if supervisor.id == user.id:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="You cannot specify yourself as your supervising professor.",
-                )
-
-            if supervisor.role_id != teacher_role.id:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"The user with email '{supervisor_email}' does not have an active Educator role.",
-                )
-
-            # Create or update pending TA approval request
-            existing_req = db.scalar(
-                select(TAApprovalRequest).where(
-                    TAApprovalRequest.applicant_id == user.id,
-                    TAApprovalRequest.status == "PENDING",
-                )
-            )
-            if existing_req:
-                existing_req.supervisor_id = supervisor.id
-                existing_req.institution_name = institution_name.strip()
-                existing_req.designation = "Teaching Assistant"
-                existing_req.subject_expertise = subject_expertise.strip()
-                existing_req.bio = bio.strip() if bio else None
-                existing_req.date_of_birth = date_of_birth
-            else:
-                new_req = TAApprovalRequest(
-                    applicant_id=user.id,
-                    supervisor_id=supervisor.id,
-                    status="PENDING",
-                    institution_name=institution_name.strip(),
-                    designation="Teaching Assistant",
-                    subject_expertise=subject_expertise.strip(),
-                    bio=bio.strip() if bio else None,
-                    date_of_birth=date_of_birth,
-                )
-                db.add(new_req)
-
-            try:
-                db.commit()
-                db.refresh(user)
-            except Exception:
-                db.rollback()
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Failed to submit Teaching Assistant application.",
-                )
-
-            sup_name = f"{supervisor.first_name} {supervisor.last_name}".strip() or supervisor.username
-            return EducatorRegistrationResponse(
-                status="PENDING_SUPERVISOR_APPROVAL",
-                message=f"Application submitted! Your request has been routed to Professor {sup_name} ({supervisor.email}) for review.",
-                role=user.role.name if user.role else UserRole.STUDENT.value,
-                class_code=None,
-                institution_name=institution_name.strip(),
-                designation="Teaching Assistant",
-                subject_expertise=subject_expertise.strip(),
-                bio=bio,
-            )
-
-        # Full Educator Instant Approval Pathway (Age >= 25 and non-TA designation)
-        user.role_id = teacher_role.id
-        user.role = teacher_role
-
-        profile = db.scalar(
-            select(TeacherProfile).where(TeacherProfile.user_id == user.id)
-        )
-
-        if not profile:
-            class_code = TeacherService._generate_unique_class_code(db, institution_name)
-            profile = TeacherProfile(
-                user_id=user.id,
-                institution_name=institution_name.strip(),
-                designation=clean_desig,
-                subject_expertise=subject_expertise.strip(),
-                bio=bio.strip() if bio else None,
+        app_res = EducatorApplicationService.create_application(
+            db=db,
+            user_id=user_id,
+            data=EducatorApplicationCreate(
+                requested_role=requested_role,
                 date_of_birth=date_of_birth,
-                class_code=class_code,
-                is_verified=True,
-            )
-            db.add(profile)
-        else:
-            profile.institution_name = institution_name.strip()
-            profile.designation = clean_desig
-            profile.subject_expertise = subject_expertise.strip()
-            profile.date_of_birth = date_of_birth
-            if bio:
-                profile.bio = bio.strip()
-            if not profile.class_code:
-                profile.class_code = TeacherService._generate_unique_class_code(db, institution_name)
-            profile.is_verified = True
-
-        try:
-            db.commit()
-            db.refresh(profile)
-            db.refresh(user)
-        except Exception:
-            db.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to register as educator. Please try again.",
-            )
-
-        # Award EDUCATOR badge
-        BadgeService.award_badge_if_eligible(db, user.id, "EDUCATOR")
+                institution_name=institution_name,
+                designation=clean_desig,
+                subject_expertise=subject_expertise,
+                bio=bio,
+                supervisor_email=supervisor_email,
+            ),
+        )
 
         return EducatorRegistrationResponse(
-            status="APPROVED",
-            message="Successfully verified and registered as educator.",
-            role=UserRole.TEACHER.value,
-            class_code=profile.class_code,
-            institution_name=profile.institution_name,
-            designation=profile.designation,
-            subject_expertise=profile.subject_expertise,
-            bio=profile.bio,
+            status="PENDING",
+            message="Your educator application has been submitted and is currently under admin review.",
+            role=user.role.name if user.role else UserRole.STUDENT.value,
+            class_code=None,
+            institution_name=institution_name.strip(),
+            designation=clean_desig,
+            subject_expertise=subject_expertise.strip(),
+            bio=bio,
         )
 
     @staticmethod

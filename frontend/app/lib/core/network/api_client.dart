@@ -420,6 +420,7 @@ class ApiClient {
     String? avatarUrl,
     String? country,
     String? dateOfBirth,
+    String? dobSource,
     String? instagramUrl,
     String? linkedinUrl,
   }) async {
@@ -439,8 +440,133 @@ class ApiClient {
             'avatar_url': ?avatarUrl,
             'country': ?country,
             'date_of_birth': ?dateOfBirth,
+            'dob_source': ?dobSource,
             'instagram_url': ?instagramUrl,
             'linkedin_url': ?linkedinUrl,
+          }),
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> applyEducatorApplication({
+    required String accessToken,
+    required String requestedRole,
+    required String dateOfBirth,
+    required String institutionName,
+    required String designation,
+    required String subjectExpertise,
+    String? bio,
+    String? supervisorEmail,
+  }) async {
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/educator-applications'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: jsonEncode({
+            'requested_role': requestedRole,
+            'date_of_birth': dateOfBirth,
+            'institution_name': institutionName,
+            'designation': designation,
+            'subject_expertise': subjectExpertise,
+            if (bio != null && bio.isNotEmpty) 'bio': bio,
+            if (supervisorEmail != null && supervisorEmail.isNotEmpty)
+              'supervisor_email': supervisorEmail,
+          }),
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>?> getMyEducatorApplication({
+    required String accessToken,
+  }) async {
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/educator-applications/me'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    if (response.body.isEmpty || response.body.trim() == 'null') return null;
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> cancelMyEducatorApplication({
+    required String accessToken,
+  }) async {
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/educator-applications/me/cancel'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<List<dynamic>> getAdminEducatorApplications({
+    required String accessToken,
+    String? status,
+  }) async {
+    final query = status != null ? '?status=$status' : '';
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/admin/educator-applications$query'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleListResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> approveEducatorApplication({
+    required String accessToken,
+    required String applicationId,
+  }) async {
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/admin/educator-applications/$applicationId/approve'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(AppConstants.requestTimeout);
+
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> rejectEducatorApplication({
+    required String accessToken,
+    required String applicationId,
+    String? adminNote,
+  }) async {
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/admin/educator-applications/$applicationId/reject'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: jsonEncode({
+            if (adminNote != null && adminNote.isNotEmpty) 'admin_note': adminNote,
           }),
         )
         .timeout(AppConstants.requestTimeout);

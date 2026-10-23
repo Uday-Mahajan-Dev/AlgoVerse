@@ -34,6 +34,7 @@ class AppRoutes {
   static const quizPlay = '/quizzes/:id/play';
   static const quizLeaderboard = '/quizzes/:id/leaderboard';
   static const customProblemView = '/custom-problems/:id';
+  static const visualizeFullscreen = '/visualize/fullscreen';
   static const settings = '/settings';
 }
 

@@ -16,12 +16,14 @@ from app.api.v1.quizzes.router import router as quizzes_router
 from app.api.v1.students.router import router as students_router
 from app.api.v1.teachers.router import router as teachers_router
 from app.api.v1.users.router import router as users_router
+from app.api.v1.educator_applications.router import router as educator_applications_router
 
 api_router = APIRouter()
 
 api_router.include_router(health_router)
 api_router.include_router(auth_router)
 api_router.include_router(users_router)
+api_router.include_router(educator_applications_router)
 api_router.include_router(students_router, prefix="/students")
 api_router.include_router(notifications_router, prefix="/notifications")
 api_router.include_router(badges_router, prefix="/badges")

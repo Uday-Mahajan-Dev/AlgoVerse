@@ -359,6 +359,45 @@ class AuthNotifier extends Notifier<AuthState> {
     );
     ref.read(authListenableProvider).notify();
   }
+
+  /// Refreshes current user profile and role from server without forcing logout.
+  Future<void> refreshCurrentUser() async {
+    final token = state.accessToken ?? await TokenStorage.getAccessToken();
+    if (token == null || token.isEmpty) return;
+
+    try {
+      final userData = await ApiClient.me(token);
+      final newRole = (userData['role_name']?.toString() ??
+              userData['role']?['name']?.toString() ??
+              state.role ??
+              'STUDENT')
+          .toUpperCase();
+      final newEmail = userData['email']?.toString() ?? state.email;
+      final firstName = userData['first_name']?.toString() ?? '';
+      final lastName = userData['last_name']?.toString() ?? '';
+      final newName = ('$firstName $lastName').trim().isNotEmpty
+          ? ('$firstName $lastName').trim()
+          : (userData['username']?.toString() ?? state.name);
+
+      final currentRefresh =
+          (state.refreshToken ?? await TokenStorage.getRefreshToken()) ?? '';
+      await TokenStorage.saveTokens(
+        accessToken: token,
+        refreshToken: currentRefresh,
+        role: newRole,
+        userId: userData['id']?.toString() ?? state.userId,
+        email: newEmail,
+        name: newName,
+      );
+
+      state = state.copyWith(
+        role: newRole,
+        email: newEmail,
+        name: newName,
+      );
+      ref.read(authListenableProvider).notify();
+    } catch (_) {}
+  }
 }
 
 final authStateProvider =

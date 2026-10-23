@@ -93,7 +93,38 @@ def update_user_profile(
     if data.preferred_language is not None:
         current_user.preferred_language = data.preferred_language.strip()
     if data.date_of_birth is not None:
+        if current_user.date_of_birth != data.date_of_birth:
+            from app.models.educator_application import EducatorApplication
+            has_locked_app = db.scalar(
+                select(EducatorApplication).where(
+                    EducatorApplication.user_id == current_user.id,
+                    EducatorApplication.status.in_(["PENDING", "APPROVED"]),
+                )
+            )
+            has_verified_tp = db.scalar(
+                select(TeacherProfile).where(
+                    TeacherProfile.user_id == current_user.id,
+                    TeacherProfile.is_verified.is_(True),
+                )
+            )
+            if has_locked_app or has_verified_tp:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Date of birth is locked while an educator application is pending or approved. Contact admin to change.",
+                )
+
+        from app.core.constants import validate_dob_range
+        try:
+            validate_dob_range(data.date_of_birth)
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e),
+            )
         current_user.date_of_birth = data.date_of_birth
+
+    if data.dob_source is not None:
+        current_user.dob_source = data.dob_source.strip().upper()
     if data.gender is not None:
         current_user.gender = data.gender.strip()
     if data.instagram_url is not None:

@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../../core/constants/app_routes.dart';
 import '../../../../core/network/api_client.dart';
 import '../../domain/entities/execution_trace.dart';
 import '../../engine/array_algorithm_executor.dart';
@@ -64,6 +66,7 @@ class _InteractiveVisualizerWorkspaceState
     super.initState();
     _initAlgorithmState();
     _loadPreferredLanguage();
+    _loadSavedSpeed();
   }
 
   @override
@@ -173,13 +176,45 @@ class _InteractiveVisualizerWorkspaceState
     return 750; // base 1.0x interval
   }
 
-  void _changeSpeed(double speed) {
+  Future<void> _loadSavedSpeed() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getDouble('visualizer_speed');
+      if (saved != null && mounted) {
+        setState(() => _playbackSpeed = saved);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _changeSpeed(double speed) async {
     setState(() {
       _playbackSpeed = speed;
     });
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble('visualizer_speed', speed);
+    } catch (_) {}
     if (_isPlaying) {
       _startPlayback();
     }
+  }
+
+  void _openFullscreen() {
+    _stopPlayback();
+    context.push(
+      AppRoutes.visualizeFullscreen,
+      extra: {
+        'trace': _trace,
+        'algorithm': _selectedAlgorithm,
+        'input': _currentInput,
+        'selectedLanguage': _selectedLanguage,
+        'contentJson': widget.contentJson,
+        'lessonId': widget.lessonId,
+        'onLessonCompleted': widget.onLessonCompleted,
+        'isLessonCompleted': widget.isLessonCompleted ?? _hasTriggeredCompletion,
+        'initialStepIndex': _currentStepIndex,
+      },
+    );
   }
 
   void _nextStep() {
@@ -448,6 +483,7 @@ class _InteractiveVisualizerWorkspaceState
     );
 
         // Visualizer Canvas + Controls + Variable State
+        final intervalMs = (_getSpeedDurationMs() / _playbackSpeed).round();
         final visualizerPane = Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -456,6 +492,16 @@ class _InteractiveVisualizerWorkspaceState
               highlights: currentStep?.highlights ?? [],
               pointers: currentStep?.pointers ?? {},
               operation: currentStep?.operation ?? 'INIT',
+              stepIntervalMs: intervalMs,
+              isPlaying: _isPlaying,
+              trailingHeaderAction: IconButton(
+                tooltip: 'Fullscreen Visualizer',
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                icon: const Icon(Icons.open_in_full, size: 16, color: Colors.indigo),
+                onPressed: _openFullscreen,
+              ),
             ),
             const SizedBox(height: 16),
             VariablePanelWidget(

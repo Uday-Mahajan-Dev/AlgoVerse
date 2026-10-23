@@ -382,7 +382,7 @@ def create_custom_problem(
     current_teacher: User = Depends(get_current_teacher),
     db: Session = Depends(get_db),
 ):
-    if request.is_published:
+    if (request.visibility or "").upper() in ("CLASS_ONLY", "PUBLIC"):
         get_verified_teacher(current_teacher, db)
     return CustomProblemService.create_custom_problem(
         db=db,
@@ -434,7 +434,7 @@ def update_custom_problem(
     current_teacher: User = Depends(get_current_teacher),
     db: Session = Depends(get_db),
 ):
-    if request.is_published is True:
+    if (request.visibility or "").upper() in ("CLASS_ONLY", "PUBLIC"):
         get_verified_teacher(current_teacher, db)
     return CustomProblemService.update_custom_problem(
         db=db,
@@ -454,11 +454,10 @@ def publish_custom_problem(
     verified_teacher: User = Depends(get_verified_teacher),
     db: Session = Depends(get_db),
 ):
-    return CustomProblemService.update_custom_problem(
+    return CustomProblemService.publish_problem(
         db=db,
+        teacher=verified_teacher,
         problem_id=problem_id,
-        teacher_id=verified_teacher.id,
-        data=CustomProblemUpdate(is_published=True),
     )
 
 
