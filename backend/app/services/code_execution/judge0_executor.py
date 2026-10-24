@@ -1,4 +1,9 @@
 import asyncio
+import base64
+import io
+import logging
+import re
+import zipfile
 import httpx
 import requests
 
@@ -8,11 +13,13 @@ from app.services.code_execution.base_executor import (
     ExecutionResult,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class Judge0Executor(BaseCodeExecutor):
     LANGUAGE_IDS = {
         "python": 71,  # Python 3.8.1
-        "java": 62,    # Java OpenJDK 13.0.1
+        "java": 89,    # Multi-file program (Java with JVM flags)
         "cpp": 54,     # C++ GCC 9.2.0
     }
 
@@ -29,6 +36,48 @@ class Judge0Executor(BaseCodeExecutor):
         12: "RE",  # Runtime Error (Other)
         13: "CE",  # Internal Error (treated as CE)
     }
+
+    @staticmethod
+    def detect_java_class_name(source_code: str) -> str:
+        """Detect public class name from Java source code, defaulting to 'Main'."""
+        code_no_comments = re.sub(r"//.*", "", source_code)
+        code_no_comments = re.sub(r"/\*.*?\*/", "", code_no_comments, flags=re.DOTALL)
+        match = re.search(r"public\s+class\s+([A-Za-z_][A-Za-z0-9_]*)", code_no_comments)
+        if match:
+            return match.group(1)
+        match_any = re.search(r"class\s+([A-Za-z_][A-Za-z0-9_]*)", code_no_comments)
+        if match_any:
+            return match_any.group(1)
+        return "Main"
+
+    @staticmethod
+    def build_java_zip(class_name: str, java_code: str) -> str:
+        """
+        Build an in-memory base64-encoded zip containing:
+        - <ClassName>.java
+        - compile script: javac -encoding UTF-8 <ClassName>.java
+        - run script with JVM metaspace flags to prevent startup memory reservation crash
+        """
+        compile_script = f"#!/bin/bash\njavac -encoding UTF-8 {class_name}.java\n"
+        run_script = (
+            f"#!/bin/bash\n"
+            f"java -XX:+UseSerialGC -XX:-UseCompressedClassPointers "
+            f"-XX:MaxMetaspaceSize=128m -Xss64m -Xmx256m -Xshare:off {class_name}\n"
+        )
+
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as z:
+            z.writestr(f"{class_name}.java", java_code)
+
+            compile_info = zipfile.ZipInfo("compile")
+            compile_info.external_attr = 0o755 << 16
+            z.writestr(compile_info, compile_script.encode("utf-8"))
+
+            run_info = zipfile.ZipInfo("run")
+            run_info.external_attr = 0o755 << 16
+            z.writestr(run_info, run_script.encode("utf-8"))
+
+        return base64.b64encode(buf.getvalue()).decode("utf-8")
 
     def _prepare_payload(
         self,
@@ -47,17 +96,33 @@ class Judge0Executor(BaseCodeExecutor):
         if lang_key not in self.LANGUAGE_IDS:
             return None, lang_key
 
-        language_id = self.LANGUAGE_IDS[lang_key]
         min_mem_kb = 512000 if lang_key == "java" else 128000
-        payload = {
-            "source_code": source_code,
-            "language_id": language_id,
-            "stdin": stdin_input,
-            "cpu_time_limit": max(0.5, time_limit_ms / 1000.0),
-            "memory_limit": max(min_mem_kb, memory_limit_mb * 1024),  # in KB
-            "enable_per_process_and_thread_time_limit": True,
-            "enable_per_process_and_thread_memory_limit": True,
-        }
+        mem_limit = max(min_mem_kb, memory_limit_mb * 1024)
+
+        if lang_key == "java":
+            class_name = self.detect_java_class_name(source_code)
+            additional_files_b64 = self.build_java_zip(class_name, source_code)
+            payload = {
+                "source_code": "",
+                "language_id": 89,
+                "additional_files": additional_files_b64,
+                "stdin": stdin_input,
+                "cpu_time_limit": max(0.5, time_limit_ms / 1000.0),
+                "memory_limit": mem_limit,
+                "enable_per_process_and_thread_time_limit": True,
+                "enable_per_process_and_thread_memory_limit": True,
+            }
+        else:
+            language_id = self.LANGUAGE_IDS[lang_key]
+            payload = {
+                "source_code": source_code,
+                "language_id": language_id,
+                "stdin": stdin_input,
+                "cpu_time_limit": max(0.5, time_limit_ms / 1000.0),
+                "memory_limit": mem_limit,
+                "enable_per_process_and_thread_time_limit": True,
+                "enable_per_process_and_thread_memory_limit": True,
+            }
         return payload, lang_key
 
     def _parse_judge0_response(self, data: dict) -> ExecutionResult:
@@ -71,12 +136,26 @@ class Judge0Executor(BaseCodeExecutor):
         if compile_output:
             stderr = f"{compile_output}\n{stderr}".strip()
 
+        # Error mapping: If JVM failed to start due to metaspace or VM init
+        if "Error occurred during initialization of VM" in stderr or "Could not allocate metaspace" in stderr:
+            logger.error("Java runtime failed to start on the judge server: %s", stderr)
+            stderr = "Java runtime failed to start on the judge server"
+            return ExecutionResult(
+                stdout=stdout,
+                stderr=stderr,
+                exit_code=1,
+                execution_time_ms=0,
+                memory_used_kb=0,
+                timed_out=False,
+                compile_error=False,
+            )
+
         raw_time = data.get("time")
         execution_time_ms = int(float(raw_time) * 1000) if raw_time else 0
         memory_used_kb = int(data.get("memory") or 0)
 
         timed_out = status_id == 5
-        compile_error = status_id == 6 or status_id == 13
+        compile_error = status_id == 6 or status_id == 13 or (bool(compile_output) and not stdout and status_id != 3)
         exit_code = 0 if status_id == 3 else (1 if compile_error or timed_out else 2)
 
         return ExecutionResult(

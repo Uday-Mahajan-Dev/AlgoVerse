@@ -685,41 +685,19 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Text(
-                              'Pending Mentorship Requests (${pending.length})',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: isAtCapacity
-                                    ? Colors.red.shade900
-                                    : const Color(0xFF1E1B4B),
-                              ),
-                            ),
-                            const Spacer(),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: isAtCapacity
-                                    ? Colors.red.shade100
-                                    : Colors.indigo.shade100,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                'Capacity: $currentEnrolled / $maxCapacity',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: isAtCapacity
-                                      ? Colors.red.shade900
-                                      : Colors.indigo.shade900,
-                                ),
-                              ),
-                            ),
-                          ],
+                        Text(
+                          'Pending Mentorship Requests (${pending.length})',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: isAtCapacity
+                                ? Colors.red.shade900
+                                : const Color(0xFF1E1B4B),
+                          ),
                         ),
+                        const SizedBox(height: 2),
                         Text(
                           isAtCapacity
                               ? 'Classroom capacity is full ($currentEnrolled/$maxCapacity). Adjust capacity or reject requests to enroll new students.'
@@ -729,6 +707,27 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
                             color: isAtCapacity
                                 ? Colors.red.shade800
                                 : Colors.indigo.shade800,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: isAtCapacity
+                                ? Colors.red.shade100
+                                : Colors.indigo.shade100,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'Capacity: $currentEnrolled / $maxCapacity',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: isAtCapacity
+                                  ? Colors.red.shade900
+                                  : Colors.indigo.shade900,
+                            ),
                           ),
                         ),
                       ],
@@ -835,8 +834,10 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
                           ),
                         ],
                         const SizedBox(height: 12),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
+                        Wrap(
+                          alignment: WrapAlignment.end,
+                          spacing: 10,
+                          runSpacing: 8,
                           children: [
                             OutlinedButton.icon(
                               onPressed: !isVerified
@@ -847,7 +848,7 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
                                 foregroundColor: Colors.red.shade700,
                                 side: BorderSide(color: Colors.red.shade300),
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 10),
+                                    horizontal: 14, vertical: 8),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(10),
                                 ),
@@ -857,7 +858,6 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
                                   style: TextStyle(
                                       fontSize: 13, fontWeight: FontWeight.bold)),
                             ),
-                            const SizedBox(width: 12),
                             FilledButton.icon(
                               onPressed: (isAtCapacity || !isVerified)
                                   ? null
@@ -866,7 +866,7 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
                               style: FilledButton.styleFrom(
                                 backgroundColor: const Color(0xFF10B981),
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 18, vertical: 10),
+                                    horizontal: 16, vertical: 8),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(10),
                                 ),
@@ -1184,7 +1184,7 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
           mainAxisSpacing: 16,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          childAspectRatio: crossAxisCount == 4 ? 1.8 : 2.2,
+          childAspectRatio: crossAxisCount == 4 ? 1.8 : (crossAxisCount == 2 ? 2.2 : 1.9),
           children: [
             _buildStatCard(
               icon: Icons.people_alt_rounded,
@@ -1233,7 +1233,7 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
     required String subtitle,
   }) {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -1905,7 +1905,7 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.teal.shade800,
                   side: BorderSide(color: Colors.teal.shade300),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   shape: RoundedRectangleBorder(
@@ -1914,7 +1914,7 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
                 ),
                 icon: const Icon(Icons.add_rounded, size: 16),
                 label: const Text(
-                  'Educator Studio',
+                  'Studio',
                   style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                 ),
               ),
@@ -2252,12 +2252,16 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
             children: [
               Icon(Icons.history_rounded, color: Colors.indigo, size: 20),
               SizedBox(width: 8),
-              Text(
-                'Recent Student Activity',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A),
+              Expanded(
+                child: Text(
+                  'Recent Student Activity',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F172A),
+                  ),
                 ),
               ),
             ],
@@ -2362,15 +2366,19 @@ class _TeacherDashboardPageState extends ConsumerState<TeacherDashboardPage> {
             children: [
               const Icon(Icons.assignment_turned_in_rounded, color: Colors.indigo, size: 20),
               const SizedBox(width: 8),
-              const Text(
-                'Assigned Homework',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A),
+              const Expanded(
+                child: Text(
+                  'Assigned Homework',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F172A),
+                  ),
                 ),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
               Text(
                 '${assignments.length} total',
                 style: TextStyle(fontSize: 12, color: Colors.grey.shade500),

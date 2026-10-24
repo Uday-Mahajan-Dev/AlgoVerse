@@ -1630,15 +1630,19 @@ class _MentorSectionState extends ConsumerState<MentorSection> {
                     children: [
                       const Icon(Icons.school_outlined, color: Colors.indigo),
                       const SizedBox(width: 8),
-                      Text(
-                        'MY MENTORS (${mentors.length})',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          letterSpacing: 1.1,
-                          fontWeight: FontWeight.bold,
+                      Expanded(
+                        child: Text(
+                          'MY MENTORS (${mentors.length})',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            letterSpacing: 1.1,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
-                      const Spacer(),
+                      const SizedBox(width: 8),
                       TextButton.icon(
                         onPressed: () {
                           context.push(AppRoutes.teachers);
@@ -2007,15 +2011,18 @@ class StudentHomeworkSection extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Assigned by ${a.teacherName}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade600,
+                      Expanded(
+                        child: Text(
+                          'Assigned by ${a.teacherName}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                          ),
                         ),
                       ),
-                      const Spacer(),
+                      const SizedBox(width: 8),
                       if (a.dueDate != null)
                         Text(
                           'Due: ${a.dueDate!.month}/${a.dueDate!.day}/${a.dueDate!.year}',

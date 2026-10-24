@@ -1,3 +1,4 @@
+import logging
 import time
 from typing import Any
 from uuid import UUID
@@ -13,6 +14,8 @@ from app.models.lesson_completion import LessonCompletion
 from app.models.submission import Submission
 from app.models.problem import Problem
 from app.schemas.ai_tutor import RecommendationItem, AIStatusResponse
+
+logger = logging.getLogger(__name__)
 
 
 SOCRATIC_HINT_SYSTEM_PROMPT = """You are a Socratic DSA tutor for the AlgoVerse platform.

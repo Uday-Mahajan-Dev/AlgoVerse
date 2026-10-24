@@ -239,55 +239,55 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.check_circle_rounded,
-                                      color: Color(0xFF10B981),
-                                      size: 20,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    const Text(
-                                      'COURSE PROGRESS',
-                                      style: TextStyle(
-                                        color: Color(0xFF14532D),
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 12,
-                                        letterSpacing: 1.1,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 8, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFDCFCE7),
-                                        borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(
-                                            color: const Color(0xFF86EFAC)),
-                                      ),
-                                      child: const Text(
-                                        'Enrolled',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                          color: Color(0xFF15803D),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                                const Icon(
+                                  Icons.check_circle_rounded,
+                                  color: Color(0xFF10B981),
+                                  size: 20,
                                 ),
-                                Text(
-                                  '$completedLessons/$totalLessons Lessons (${completionPct.toStringAsFixed(0)}%)',
-                                  style: const TextStyle(
-                                    color: Color(0xFF14532D),
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
+                                const SizedBox(width: 8),
+                                const Flexible(
+                                  child: Text(
+                                    'COURSE PROGRESS',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: Color(0xFF14532D),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                      letterSpacing: 1.1,
+                                    ),
+                                  ),
+                                ),
+                                const Spacer(),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFDCFCE7),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                        color: const Color(0xFF86EFAC)),
+                                  ),
+                                  child: const Text(
+                                    'Enrolled',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF15803D),
+                                    ),
                                   ),
                                 ),
                               ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '$completedLessons/$totalLessons Lessons (${completionPct.toStringAsFixed(0)}%)',
+                              style: const TextStyle(
+                                color: Color(0xFF14532D),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
                             ),
                             const SizedBox(height: 12),
                             ClipRRect(

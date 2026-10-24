@@ -78,14 +78,18 @@ class _TeacherTopBarState extends State<TeacherTopBar> {
               ),
               const SizedBox(width: 8),
             ],
-            Text(
-              'Faculty Analytics Hub',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: Colors.purple.shade900,
+            Expanded(
+              child: Text(
+                'Faculty Analytics Hub',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.purple.shade900,
+                ),
               ),
             ),
-            const Spacer(),
+            const SizedBox(width: 8),
             IconButton(
               onPressed: () => _showNotifications(context),
               icon: Badge(

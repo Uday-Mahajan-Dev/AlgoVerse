@@ -95,7 +95,7 @@ class CustomProblemService:
                             "starter_code_cpp": data["cpp"].strip(),
                         }
             except Exception as e:
-                logger.warning(f"AI starter code generation failed, using smart fallback: {e}")
+                logger.exception("AI starter code generation failed, using smart fallback: %s", e)
 
         # 2. Smart Regex Fallback Parser
         func_name = "solve"
